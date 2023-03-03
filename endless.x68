@@ -111,6 +111,11 @@ INITIALISE:
     ; Initialize Player on Ground
     MOVE.L  #GND_TRUE,  PLYR_ON_GND ; Init Player on Ground
 
+    ;Initialize Delta Time
+    CLR.L D1
+    MOVE.L  #4, D1
+    MOVE.L D1, DELTA_TIME
+
     ; Initial Position for Enemy
     CLR.L   D1                      ; Clear contents of D1 (XOR is faster)
     MOVE.W  SCREEN_W,   D1          ; Place Screen width in D1
@@ -140,13 +145,24 @@ INITIALISE:
 GAME:
     BSR     PLAY_RUN                ; Play Run Wav
 GAMELOOP:
+    MOVE.B #8, D0
+    TRAP #15
+    MOVE.L D1, DELTA_TIME
     ; Main Gameloop
     BSR     INPUT                   ; Check Keyboard Input
     BSR     UPDATE                  ; Update positions and points
     BSR     IS_PLAYER_ON_GND        ; Check if player is on ground
     BSR     CHECK_COLLISIONS        ; Check for Collisions
     BSR     DRAW                    ; Draw the Scene
-    BRA     GAMELOOP                ; Loop back to GameLoop
+
+DELTA_T:
+    MOVE.B #8, D0
+    TRAP #15
+    SUB.L DELTA_TIME, D1
+
+    CMP.L #4, D1
+    BMI.S DELTA_T
+    BRA GAMELOOP
 
 *-----------------------------------------------------------
 * Subroutine    : Input
@@ -683,6 +699,8 @@ PLYR_ON_GND     DS.L    01  ; Reserve Space for Player on Ground
 
 ENEMY_X         DS.L    01  ; Reserve Space for Enemy X Position
 ENEMY_Y         DS.L    01  ; Reserve Space for Enemy Y Position
+
+DELTA_TIME      DS.L    01  ; Reserve Space for Delta Time
 
 *-----------------------------------------------------------
 * Section       : Sounds
