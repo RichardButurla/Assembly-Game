@@ -152,6 +152,7 @@ GAMELOOP:
     BSR     INPUT                   ; Check Keyboard Input
     BSR     UPDATE                  ; Update positions and points
     BSR     IS_PLAYER_ON_GND        ; Check if player is on ground
+    BSR     IS_PLAYER_AT_CEILING    ; Check if player hit the ceiling
     BSR     CHECK_COLLISIONS        ; Check for Collisions
     BSR     DRAW                    ; Draw the Scene
 
@@ -417,8 +418,9 @@ IS_PLAYER_ON_GND:
     ; Check if Player is on Ground
     CLR.L   D1                      ; Clear contents of D1 (XOR is faster)
     CLR.L   D2                      ; Clear contents of D2 (XOR is faster)
-    MOVE.W  SCREEN_H,   D1          ; Place Screen width in D1
-    DIVU    #02,        D1          ; divide by 2 for center on Y Axis
+    MOVE.W  SCREEN_H,   D1          ; Place Screen height in D1
+    ;DIVU    #02,        D1          ; divide by 2 for center on Y Axis
+     SUB.L   #10, D1
     MOVE.L  PLAYER_Y,   D2          ; Player Y Position
     CMP     D1,         D2          ; Compare middle of Screen with Players Y Position 
     BGE     SET_ON_GROUND           ; The Player is on the Ground Plane
@@ -433,7 +435,8 @@ IS_PLAYER_ON_GND:
 SET_ON_GROUND:
     CLR.L   D1                      ; Clear contents of D1 (XOR is faster)
     MOVE.W  SCREEN_H,   D1          ; Place Screen width in D1
-    DIVU    #02,        D1          ; divide by 2 for center on Y Axis
+    ;DIVU    #02,        D1          ; divide by 2 for center on Y Axis
+    SUB.L   #10, D1
     MOVE.L  D1,         PLAYER_Y    ; Reset the Player Y Position
     CLR.L   D1                      ; Clear contents of D1 (XOR is faster)
     MOVE.L  #00,        D1          ; Player Velocity
@@ -442,26 +445,46 @@ SET_ON_GROUND:
     RTS
 
 *-----------------------------------------------------------
+* Subroutine    : Player is at the ceiling
+* Description   : Set the Player at ceiling
+*-----------------------------------------------------------
+IS_PLAYER_AT_CEILING:
+    CLR D1
+    CLR D2
+    MOVE.W #5,  D1
+    MOVE.L PLAYER_Y, D2
+    CMP D1,     D2
+    BLT SET_AT_CEILING
+    RTS
+
+*-----------------------------------------------------------
+* Subroutine    : Player is at the ceiling
+* Description   : Set the Player at ceiling
+*-----------------------------------------------------------
+SET_AT_CEILING:
+    MOVE.L  #00,         PLYR_VELOCITY ; Set Player Velocity
+    MOVE.L  #5,          PLAYER_Y
+    RTS    
+*-----------------------------------------------------------
 * Subroutine    : Off Ground
 * Description   : Set the Player Off Ground
 *-----------------------------------------------------------
 SET_OFF_GROUND:
     MOVE.L  #GND_FALSE, PLYR_ON_GND ; Player if off Ground
     RTS                             ; Return to subroutine
+
+
 *-----------------------------------------------------------
 * Subroutine    : Jump
 * Description   : Perform a Jump
 *-----------------------------------------------------------
 JUMP:
-    CMP.L   #GND_TRUE,PLYR_ON_GND   ; Player is on the Ground ?
-    BEQ     PERFORM_JUMP            ; Do Jump
-    BRA     JUMP_DONE               ;
+    BSR     PERFORM_JUMP            ; Do Jump
 PERFORM_JUMP:
     BSR     PLAY_JUMP               ; Play jump sound
     MOVE.L  #PLYR_JUMP_V,PLYR_VELOCITY ; Set the players velocity to true
     RTS                             ; Return to subroutine
-JUMP_DONE:
-    RTS                             ; Return to subroutine
+
 
     *-----------------------------------------------------------
 * Subroutine    : Move
