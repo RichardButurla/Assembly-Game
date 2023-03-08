@@ -30,7 +30,7 @@ PLYR_W_INIT EQU         08          ; Players initial Width
 PLYR_H_INIT EQU         08          ; Players initial Height
 
 PLYR_DFLT_V EQU         00          ; Default Player Velocity
-PLYR_JUMP_V EQU        -20          ; Player Jump Velocity
+PLYR_JUMP_V EQU        -10          ; Player Jump Velocity
 PLYR_DFLT_G EQU         01          ; Player Default Gravity
 PLYR_MOVE_X_VEL EQU     01      ;Player X Velocity
 PLYR_MOVE_Y_VEL EQU     01      ;Player X Velocity
@@ -43,7 +43,13 @@ JMP_INDEX   EQU         01          ; Player Jump Sound Index
 OPPS_INDEX  EQU         02          ; Player Opps Sound Index
 
 ENMY_W_INIT EQU         08          ; Enemy initial Width
-ENMY_H_INIT EQU         08          ; Enemy initial Height
+ENMY_H_INIT EQU         128          ; Enemy initial Height
+ENEMY_DEFAULT_VELOCITY  EQU     -5
+
+MAX_NUM_COINS       EQU     05
+COIN_DFLT_VELOCITY  EQU     -3
+COIN_W_INIT         EQU     04
+COIN_H_INIT         EQU     04
 
 *-----------------------------------------------------------
 * Section       : Game Stats
@@ -111,11 +117,6 @@ INITIALISE:
     ; Initialize Player on Ground
     MOVE.L  #GND_TRUE,  PLYR_ON_GND ; Init Player on Ground
 
-    ;Initialize Delta Time
-    CLR.L D1
-    MOVE.L  #4, D1
-    MOVE.L D1, DELTA_TIME
-
     ; Initial Position for Enemy
     CLR.L   D1                      ; Clear contents of D1 (XOR is faster)
     MOVE.W  SCREEN_W,   D1          ; Place Screen width in D1
@@ -125,6 +126,37 @@ INITIALISE:
     MOVE.W  SCREEN_H,   D1          ; Place Screen width in D1
     DIVU    #02,        D1          ; divide by 2 for center on Y Axis
     MOVE.L  D1,         ENEMY_Y     ; Enemy Y Position
+
+    ;initial velocity for enemy
+    CLR.L D1
+    MOVE.L #ENEMY_DEFAULT_VELOCITY, D1
+    MOVE.L D1,      ENEMY_VELOCITY
+
+    ;initial velocity for enemy
+    CLR.L D1
+    MOVE.L #COIN_DFLT_VELOCITY, D1
+    MOVE.L D1,      COIN_VELOCITY
+
+    ;Initialise coins nums
+    CLR.L D0
+    CLR.L D1
+    MOVE.B #MAX_NUM_COINS, D1 ;Loop counter for 5 coins, We subtract 1 to get 4 since counts down to 0 and DBRA branches again leaving -1 in A1
+    SUB.B #1, D1
+    MOVE.B #20,D3 ; move 20 into d3, this will be used for coins y positions
+    LEA     COIN_ARRAY_X, A1
+    LEA     COIN_ARRAY_Y, A0
+
+
+FOR_LOOP: 
+    MOVE.B #0,(A1)+ ;move element decimal 0 into A1 and increment A1 to next coin
+    MOVE.B D3,(A0)+ ;move d3(20) into A0 and increment A0 to next coin
+    ADD.B  #20,D3   ;add 20 to d3, loop will make coin y positions look like 20,40,60,etc
+    DBRA      D1,FOR_LOOP
+
+    ;Initialize Delta Time
+    CLR.L D1
+    MOVE.L  #4, D1
+    MOVE.L D1, DELTA_TIME
 
     ; Enable the screen back buffer(see easy 68k help)
 	MOVE.B  #TC_DBL_BUF,D0          ; 92 Enables Double Buffer
@@ -151,9 +183,6 @@ GAMELOOP:
     ; Main Gameloop
     BSR     INPUT                   ; Check Keyboard Input
     BSR     UPDATE                  ; Update positions and points
-    BSR     IS_PLAYER_ON_GND        ; Check if player is on ground
-    BSR     IS_PLAYER_AT_CEILING    ; Check if player hit the ceiling
-    BSR     CHECK_COLLISIONS        ; Check for Collisions
     BSR     DRAW                    ; Draw the Scene
 
 DELTA_T:
@@ -173,42 +202,41 @@ INPUT:
     ; Process Input
     CLR.L   D1                      ; Clear Data Register
     MOVE.B  #TC_KEYCODE,D0          ; Listen for Keys
-    TRAP    #15                     ; Trap (Perform action)
-    MOVE.B  D1,         D2          ; Move last key D1 to D2
-    CMP.B   #00,        D2          ; Key is pressed
-    BEQ     PROCESS_INPUT           ; Process Key
-    TRAP    #15                     ; Trap for Last Key
-    ; Check if key still pressed
-    CMP.B   #$FF,       D1          ; Is it still pressed
-    BEQ     PROCESS_INPUT           ; Process Last Key
-    RTS                             ; Return to subroutine
+    MOVE.L #$20415344,  D1          ; All the inputs put in D1 WASD, in One Byte
+    TRAP    #15
 
-*-----------------------------------------------------------
-* Subroutine    : Process Input
-* Description   : Branch based on keys pressed
-*-----------------------------------------------------------
-PROCESS_INPUT:
-    MOVE.L  D2,         CURRENT_KEY ; Put Current Key in Memory
-    CMP.L   #ESCAPE,    CURRENT_KEY ; Is Current Key Escape
-    BEQ     EXIT                    ; Exit if Escape
-    CMP.L   #SPACEBAR,  CURRENT_KEY ; Is Current Key Spacebar
-    BEQ     JUMP                    ; Jump
-    CMP.L   #W_KEY,     CURRENT_KEY ; Is Current Key Spacebar
-    BEQ     MOVE_PLAYER_UP             ; Move Player
-    CMP.L   #A_KEY,     CURRENT_KEY ; Is Current Key Spacebar
-    BEQ     MOVE_PLAYER_LEFT             ; Move Player
-    CMP.L   #S_KEY,     CURRENT_KEY ; Is Current Key Spacebar
-    BEQ     MOVE_PLAYER_DOWN             ; Move Player
-    CMP.L   #D_KEY,     CURRENT_KEY ; Is Current Key Spacebar
-    BEQ     MOVE_PLAYER_RIGHT            ; Move Player 
-    BRA     IDLE                    ; Or Idle
-    RTS                             ; Return to subroutine
+    CMP.L    #$FF000000, D1
+    BEQ     JUMP
+
+    RTS
 
 *-----------------------------------------------------------
 * Subroutine    : Update
 * Description   : Main update loop update Player and Enemies
 *-----------------------------------------------------------
 UPDATE:
+    BSR     UPDATE_PLAYER
+    BSR     UPDATE_ENEMY
+
+    RTS                             ; Return to subroutine  
+
+
+*-----------------------------------------------------------
+* Subroutine    : Update player
+* Description   : Update Player
+*-----------------------------------------------------------
+UPDATE_PLAYER:
+  
+    BSR     MOVE_PLAYER
+    BSR     IS_PLAYER_ON_GND        ; Check if player is on ground
+    BSR     IS_PLAYER_AT_CEILING    ; Check if player hit the ceiling
+    RTS
+    
+*-----------------------------------------------------------
+* Subroutine    : Move player
+* Description   : move Player
+*-----------------------------------------------------------
+MOVE_PLAYER:
     ; Update the Players Positon based on Velocity and Gravity
     CLR.L   D1                      ; Clear contents of D1 (XOR is faster)
     MOVE.L  PLYR_VELOCITY, D1       ; Fetch Player Velocity
@@ -217,26 +245,41 @@ UPDATE:
     MOVE.L  D1,         PLYR_VELOCITY ; Update Player Velocity
     ADD.L   PLAYER_Y,   D1          ; Add Velocity to Player
     MOVE.L  D1,         PLAYER_Y    ; Update Players Y Position 
-
-    ; Move the Enemy
-    CLR.L   D1                      ; Clear contents of D1 (XOR is faster)
-    CLR.L   D1                      ; Clear the contents of D0
-    MOVE.L  ENEMY_X,    D1          ; Move the Enemy X Position to D0
-    CMP.L   #00,        D1
-    BLE     RESET_ENEMY_POSITION    ; Reset Enemy if off Screen
-    BRA     MOVE_ENEMY              ; Move the Enemy
-
-    RTS                             ; Return to subroutine  
-
-*-----------------------------------------------------------
-* Subroutine    : Move Enemy
-* Description   : Move Enemy Right to Left
-*-----------------------------------------------------------
-MOVE_ENEMY:
-    SUB.L   #01,        ENEMY_X     ; Move enemy by X Value
     RTS
 
 *-----------------------------------------------------------
+* Subroutine    : Update enemy
+* Description   : Update enemy
+*-----------------------------------------------------------
+UPDATE_ENEMY:
+    BSR MOVE_ENEMY
+
+    MOVE.L  ENEMY_X,    D1          ; Move the Enemy X Position to D1
+    CMP.L   #00,        D1
+    BLE     RESET_ENEMY   ; Reset Enemy if off Screen
+
+    RTS
+    
+*-----------------------------------------------------------
+* Subroutine    : Move enemy
+* Description   : Moves enemy
+*-----------------------------------------------------------
+MOVE_ENEMY:
+    CLR.L   D1                      ; Clear contents of D1 (XOR is faster)
+    MOVE.L  ENEMY_VELOCITY, D1       
+    ADD.L   ENEMY_X,   D1          ; Add Velocity to Enemy
+    MOVE.L  D1,         ENEMY_X    ; Update Players Y Position 
+    RTS
+
+    *-----------------------------------------------------------
+* Subroutine    : Reset Enemy
+* Description   : Reset Enemy
+*-----------------------------------------------------------
+RESET_ENEMY:
+    BSR RESET_ENEMY_POSITION
+    RTS
+
+    *-----------------------------------------------------------
 * Subroutine    : Reset Enemy
 * Description   : Reset Enemy if to passes 0 to Right of Screen
 *-----------------------------------------------------------
@@ -245,6 +288,7 @@ RESET_ENEMY_POSITION:
     MOVE.W  SCREEN_W,   D1          ; Place Screen width in D1
     MOVE.L  D1,         ENEMY_X     ; Enemy X Position
     RTS
+
 
 *-----------------------------------------------------------
 * Subroutine    : Draw
@@ -262,7 +306,8 @@ DRAW:
 
     BSR     DRAW_PLYR_DATA          ; Draw Draw Score, HUD, Player X and Y
     BSR     DRAW_PLAYER             ; Draw Player
-    BSR     DRAW_ENEMY              ; Draw Enemy
+    BSR     DRAW_ENEMY
+    BSR     DRAW_COINS
     RTS                             ; Return to subroutine
 
 *-----------------------------------------------------------
@@ -420,7 +465,7 @@ IS_PLAYER_ON_GND:
     CLR.L   D2                      ; Clear contents of D2 (XOR is faster)
     MOVE.W  SCREEN_H,   D1          ; Place Screen height in D1
     ;DIVU    #02,        D1          ; divide by 2 for center on Y Axis
-     SUB.L   #10, D1
+    SUB.L   #10, D1
     MOVE.L  PLAYER_Y,   D2          ; Player Y Position
     CMP     D1,         D2          ; Compare middle of Screen with Players Y Position 
     BGE     SET_ON_GROUND           ; The Player is on the Ground Plane
@@ -462,8 +507,12 @@ IS_PLAYER_AT_CEILING:
 * Description   : Set the Player at ceiling
 *-----------------------------------------------------------
 SET_AT_CEILING:
-    MOVE.L  #00,         PLYR_VELOCITY ; Set Player Velocity
-    MOVE.L  #5,          PLAYER_Y
+    CLR D1
+    MOVE.L #00,     D1
+    MOVE.L  D1,         PLYR_VELOCITY ; Set Player Velocity
+    CLR D1
+    MOVE.L  #5,          D1
+    MOVE.L  D1,         PLAYER_Y
     RTS    
 *-----------------------------------------------------------
 * Subroutine    : Off Ground
@@ -578,6 +627,47 @@ DRAW_PLAYER:
     TRAP    #15                     ; Trap (Perform action)
     RTS                             ; Return to subroutine
 
+    *-----------------------------------------------------------
+* Subroutine    : Draw Coins
+* Description   : Draw Coin Squares
+*-----------------------------------------------------------
+DRAW_COINS:
+
+    ; Set Pixel Colors
+    MOVE.L  #YELLOW,     D1          ; Set Background color
+    MOVE.B  #80,        D0          ; Task for Background Color
+    TRAP    #15                     ; Trap (Perform action)
+
+     CLR D0
+    CLR D1
+    CLR D2
+    CLR D3
+    CLR D4
+    CLR D5
+
+    ; Set X, Y, Width and Height
+    LEA     COIN_ARRAY_X, A0
+    LEA     COIN_ARRAY_Y, A1
+
+    MOVE.B #MAX_NUM_COINS, D5
+    SUB.B #1,D5     ;Our index which is MAX_COINS - 1
+
+DRAW_COIN_LOOP:
+    MOVE.B (A0), D1     ;Coin X Pos
+    MOVE.B (A1), D2     ;Coin Y Pos
+    MOVE.B (A0)+, D3     ;Coin X Pos that we will add width onto and increment pointer
+    ADD.B #COIN_W_INIT, D3
+    MOVE.B (A1)+, D4     ;Coin Y Pos that we will add height onto and increment pointer
+    ADD.B #COIN_H_INIT, D4
+
+    ; Draw Coin
+    MOVE.B  #87,        D0          ; Draw Player
+    TRAP    #15                     ; Trap (Perform action)
+
+    DBRA D5,DRAW_COIN_LOOP
+
+    RTS
+
 *-----------------------------------------------------------
 * Subroutine    : Draw Enemy
 * Description   : Draw Enemy Square
@@ -600,57 +690,6 @@ DRAW_ENEMY:
     MOVE.B  #87,        D0          ; Draw Enemy
     TRAP    #15                     ; Trap (Perform action)
     RTS                             ; Return to subroutine
-
-*-----------------------------------------------------------
-* Subroutine    : Collision Check
-* Description   : Axis-Aligned Bounding Box Collision Detection
-* Algorithm checks for overlap on the 4 sides of the Player and 
-* Enemy rectangles
-* PLAYER_X <= ENEMY_X + ENEMY_W &&
-* PLAYER_X + PLAYER_W >= ENEMY_X &&
-* PLAYER_Y <= ENEMY_Y + ENEMY_H &&
-* PLAYER_H + PLAYER_Y >= ENEMY_Y
-*-----------------------------------------------------------
-CHECK_COLLISIONS:
-    CLR.L   D1                      ; Clear D1
-    CLR.L   D2                      ; Clear D2
-PLAYER_X_LTE_TO_ENEMY_X_PLUS_W:
-    MOVE.L  PLAYER_X,   D1          ; Move Player X to D1
-    MOVE.L  ENEMY_X,    D2          ; Move Enemy X to D2
-    ADD.L   ENMY_W_INIT,D2          ; Set Enemy width X + Width
-    CMP.L   D1,         D2          ; Do the Overlap ?
-    BLE     PLAYER_X_PLUS_W_LTE_TO_ENEMY_X  ; Less than or Equal ?
-    BRA     COLLISION_CHECK_DONE    ; If not no collision
-PLAYER_X_PLUS_W_LTE_TO_ENEMY_X:     ; Check player is not  
-    ADD.L   PLYR_W_INIT,D1          ; Move Player Width to D1
-    MOVE.L  ENEMY_X,    D2          ; Move Enemy X to D2
-    CMP.L   D1,         D2          ; Do they OverLap ?
-    BGE     PLAYER_Y_LTE_TO_ENEMY_Y_PLUS_H  ; Less than or Equal
-    BRA     COLLISION_CHECK_DONE    ; If not no collision   
-PLAYER_Y_LTE_TO_ENEMY_Y_PLUS_H:     
-    MOVE.L  PLAYER_Y,   D1          ; Move Player Y to D1
-    MOVE.L  ENEMY_Y,    D2          ; Move Enemy Y to D2
-    ADD.L   ENMY_H_INIT,D2          ; Set Enemy Height to D2
-    CMP.L   D1,         D2          ; Do they Overlap ?
-    BLE     PLAYER_Y_PLUS_H_LTE_TO_ENEMY_Y  ; Less than or Equal
-    BRA     COLLISION_CHECK_DONE    ; If not no collision 
-PLAYER_Y_PLUS_H_LTE_TO_ENEMY_Y:     ; Less than or Equal ?
-    ADD.L   PLYR_H_INIT,D1          ; Add Player Height to D1
-    MOVE.L  ENEMY_Y,    D2          ; Move Enemy Height to D2  
-    CMP.L   D1,         D2          ; Do they OverLap ?
-    BGE     COLLISION               ; Collision !
-    BRA     COLLISION_CHECK_DONE    ; If not no collision
-COLLISION_CHECK_DONE:               ; No Collision Update points
-    ADD.L   #POINTS,    D1          ; Move points upgrade to D1
-    ADD.L   PLAYER_SCORE,D1         ; Add to current player score
-    MOVE.L  D1, PLAYER_SCORE        ; Update player score in memory
-    RTS                             ; Return to subroutine
-
-COLLISION:
-    BSR     PLAY_OPPS               ; Play Opps Wav
-    MOVE.L  #00, PLAYER_SCORE       ; Reset Player Score
-    RTS                             ; Return to subroutine
-
 *-----------------------------------------------------------
 * Subroutine    : EXIT
 * Description   : Exit message and End Game
@@ -694,6 +733,7 @@ EXIT_MSG        DC.B    'Exiting....', 0    ; Exit Message
 *-----------------------------------------------------------
 WHITE           EQU     $00FFFFFF
 RED             EQU     $000000FF
+YELLOW          EQU     $0000FFFF
 
 *-----------------------------------------------------------
 * Section       : Screen Size
@@ -716,12 +756,17 @@ PLAYER_X        DS.L    01  ; Reserve Space for Player X Position
 PLAYER_Y        DS.L    01  ; Reserve Space for Player Y Position
 PLAYER_SCORE    DS.L    01  ; Reserve Space for Player Score
 
+ENEMY_X         DS.L    01
+ENEMY_Y         DS.L    01
+ENEMY_VELOCITY  DS.L    01
+
+COIN_ARRAY_X    DC.B   00,00,00,00,00  ;Reserve space for 5 coins xPos
+COIN_ARRAY_Y    DC.B   00,00,00,00,00  ;Reserve space for 5 coins yPos
+COIN_VELOCITY   DS.L    01
+
 PLYR_VELOCITY   DS.L    01  ; Reserve Space for Player Velocity
 PLYR_GRAVITY    DS.L    01  ; Reserve Space for Player Gravity
 PLYR_ON_GND     DS.L    01  ; Reserve Space for Player on Ground
-
-ENEMY_X         DS.L    01  ; Reserve Space for Enemy X Position
-ENEMY_Y         DS.L    01  ; Reserve Space for Enemy Y Position
 
 DELTA_TIME      DS.L    01  ; Reserve Space for Delta Time
 
@@ -737,3 +782,7 @@ RUN_WAV         DC.B    'run.wav',0         ; Run Sound
 OPPS_WAV        DC.B    'opps.wav',0        ; Collision Opps
 
     END    START        ; last line of source
+*~Font name~Courier New~
+*~Font size~10~
+*~Tab type~1~
+*~Tab size~4~
