@@ -140,7 +140,7 @@ INITIALISE:
     ;Initialise coins nums
     CLR.L D0
     CLR.L D1
-    
+
     MOVE.B #MAX_NUM_COINS, D1 ;Loop counter for 5 coins, We subtract 1 to get 4 since counts down to 0 and DBRA branches again leaving -1 in A1
     SUB.B #1, D1
 
@@ -221,7 +221,7 @@ INPUT:
 UPDATE:
     BSR     UPDATE_PLAYER
     BSR     UPDATE_ENEMY
-    ;BSR     UPDATE_COINS
+    BSR     UPDATE_COINS
     RTS                             ; Return to subroutine  
 
 
