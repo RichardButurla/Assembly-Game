@@ -300,9 +300,43 @@ RESET_ENEMY_POSITION:
 *-----------------------------------------------------------
 UPDATE_COINS:
     BSR MOVE_COINS
+    BSR CHECK_COIN_POSITIONS
 
     RTS
 
+*-----------------------------------------------------------
+* Subroutine    : Checks coins Positions
+* Description   : Checks coins Positions
+*-----------------------------------------------------------
+CHECK_COIN_POSITIONS:
+    CLR D0
+    CLR D1
+    LEA COIN_ARRAY_X, A0
+
+
+    MOVE.B #MAX_NUM_COINS,D0
+    SUB.B #1, D0 ;MAX_COINS - 1
+
+CHECK_COIN_POS_LOOP:
+    CMP.L   #00,     (A0)
+    BLE     RESET_COIN   ; Reset Coin if off Screen
+
+    ADD    #4,A0
+    DBRA D0,CHECK_COIN_POS_LOOP
+    
+
+    RTS
+
+*-----------------------------------------------------------
+* Subroutine    : Resets coins
+* Description   : Resets coins
+*-----------------------------------------------------------
+RESET_COIN:
+    CLR.L   D1                      ; Clear contents of D1 (XOR is faster)
+    MOVE.W  SCREEN_W,   D1          ; Place Screen width in D1
+    MOVE.L  D1,         (A0)      ; Coin X Position
+
+    RTS
 *-----------------------------------------------------------
 * Subroutine    : Move coins
 * Description   : move array of coins
