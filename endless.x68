@@ -242,7 +242,8 @@ UPDATE_PLAYER:
 *-----------------------------------------------------------
 MOVE_PLAYER:
     ; Update the Players Positon based on Velocity and Gravity
-    CLR.L   D1                      ; Clear contents of D1 (XOR is faster)
+    CLR.L   D1  
+    CLR.L   D2                    ; Clear contents of D1 (XOR is faster)
     MOVE.L  PLYR_VELOCITY, D1       ; Fetch Player Velocity
     MOVE.L  PLYR_GRAVITY, D2        ; Fetch Player Gravity
     ADD.L   D2,         D1          ; Add Gravity to Velocity
@@ -309,9 +310,10 @@ UPDATE_COINS:
 * Description   : Checks coins Positions
 *-----------------------------------------------------------
 CHECK_COIN_POSITIONS:
-    CLR D0
-    CLR D1
+    CLR.L D0
+    CLR.L D1
     LEA COIN_ARRAY_X, A0
+    LEA COIN_ARRAY_Y, A1
 
 
     MOVE.B #MAX_NUM_COINS,D0
@@ -321,7 +323,8 @@ CHECK_COIN_POS_LOOP:
     CMP.L   #00,     (A0)
     BLE     RESET_COIN   ; Reset Coin if off Screen
 
-    ADD    #4,A0
+    ADD    #4,A0         ; increment A0 by 4 memory locations. The next CoinArrayX which is a Long
+    ADD    #4,A1         ; increment A0 by 4 memory locations. The next CoinArrayX which is a Long
     DBRA D0,CHECK_COIN_POS_LOOP
     
 
@@ -333,10 +336,57 @@ CHECK_COIN_POS_LOOP:
 *-----------------------------------------------------------
 RESET_COIN:
     CLR.L   D1                      ; Clear contents of D1 (XOR is faster)
+    CLR.L   D3                      ; Clear contents of D1 (XOR is faster)
     MOVE.W  SCREEN_W,   D1          ; Place Screen width in D1
     MOVE.L  D1,         (A0)      ; Coin X Position
 
+    CLR.L       D0
+    CLR.L       D1
+    CLR.L       D3
+    MOVE.B      #8, D0         ;Access time since midnight
+    TRAP        #15
+    AND.L       #$7FFFF,D1    ;prevent overflow in divu
+    DIVU        #10, D1
+    SWAP        D1
+    ADDQ.W      #1, D1        ;
+    MOVE        D1, D3 
+
+    ;another new rand number
+    CLR.L       D0
+    CLR.L       D1
+    CLR.L       D4
+    MOVE.B      #8, D0         ;Access time since midnight
+    TRAP        #15
+    AND.L       #$7FFFF,D1    ;prevent overflow in divu
+    DIVU        #10, D1
+    SWAP        D1
+    ADDQ.W      #1, D1        ;
+    MOVE        D1, D4 
+    ADD.W      #10,D4
+
+    CLR.L         D0
+    CLR.L         D1
+    MOVE.L      SCREEN_H,D0
+    CLR.W         D0
+    SWAP        D0
+    MOVE.L      #COIN_H_INIT,D1
+    SUB.L       D1,D0   ;take coin Y size from Screen Height
+    DIVS.W        D4 ,D0  ;divide by 2nd rand num
+    MULS.W        D3,D0   ;multiply by random number
+    MOVE.L      D0,(A1) ;set new Y Pos
+
     RTS
+
+*-----------------------------------------------------------
+* Subroutine    : Randomise Coin Y Pos
+* Description   : randomises a y position for a coin
+*-----------------------------------------------------------
+RAND_COIN_Y_POS:
+    ;Will give us 0-9 + 1
+   
+
+    RTS
+
 *-----------------------------------------------------------
 * Subroutine    : Move coins
 * Description   : move array of coins
@@ -562,8 +612,8 @@ SET_ON_GROUND:
 * Description   : Set the Player at ceiling
 *-----------------------------------------------------------
 IS_PLAYER_AT_CEILING:
-    CLR D1
-    CLR D2
+    CLR.L D1
+    CLR.L D2
     MOVE.W #5,  D1
     MOVE.L PLAYER_Y, D2
     CMP D1,     D2
@@ -575,10 +625,10 @@ IS_PLAYER_AT_CEILING:
 * Description   : Set the Player at ceiling
 *-----------------------------------------------------------
 SET_AT_CEILING:
-    CLR D1
+    CLR.L D1
     MOVE.L #00,     D1
     MOVE.L  D1,         PLYR_VELOCITY ; Set Player Velocity
-    CLR D1
+    CLR.L D1
     MOVE.L  #5,          D1
     MOVE.L  D1,         PLAYER_Y
     RTS    
@@ -706,12 +756,12 @@ DRAW_COINS:
     MOVE.B  #80,        D0          ; Task for Background Color
     TRAP    #15                     ; Trap (Perform action)
 
-    CLR D0
-    CLR D1
-    CLR D2
-    CLR D3
-    CLR D4
-    CLR D5
+    CLR.L D0
+    CLR.L D1
+    CLR.L D2
+    CLR.L D3
+    CLR.L D4
+    CLR.L D5
 
     ; Set X, Y, Width and Height
     LEA     COIN_ARRAY_X, A0
