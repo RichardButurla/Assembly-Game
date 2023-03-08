@@ -140,17 +140,21 @@ INITIALISE:
     ;Initialise coins nums
     CLR.L D0
     CLR.L D1
+    
     MOVE.B #MAX_NUM_COINS, D1 ;Loop counter for 5 coins, We subtract 1 to get 4 since counts down to 0 and DBRA branches again leaving -1 in A1
     SUB.B #1, D1
-    MOVE.B #20,D3 ; move 20 into d3, this will be used for coins y positions
+
     LEA     COIN_ARRAY_X, A1
     LEA     COIN_ARRAY_Y, A0
 
-
+    MOVE.L #20,D3 ; move 20 into d3, this will be used for coins y positions
 FOR_LOOP: 
-    MOVE.B #0,(A1)+ ;move element decimal 0 into A1 and increment A1 to next coin
-    MOVE.B D3,(A0)+ ;move d3(20) into A0 and increment A0 to next coin
-    ADD.B  #20,D3   ;add 20 to d3, loop will make coin y positions look like 20,40,60,etc
+
+    MOVE.L D3,(A0)+ ;move d3(20) into A0 and increment A0 to next coin
+    ADD.L  #20,D3   ;add 20 to d3, loop will make coin y positions look like 20,40,60,etc
+
+    MOVE.L #200,(A1)+ ;move element decimal 200 into A1 and increment A1 to next coin
+
     DBRA      D1,FOR_LOOP
 
     ;Initialize Delta Time
@@ -217,7 +221,7 @@ INPUT:
 UPDATE:
     BSR     UPDATE_PLAYER
     BSR     UPDATE_ENEMY
-
+    ;BSR     UPDATE_COINS
     RTS                             ; Return to subroutine  
 
 
@@ -289,6 +293,36 @@ RESET_ENEMY_POSITION:
     MOVE.L  D1,         ENEMY_X     ; Enemy X Position
     RTS
 
+
+*-----------------------------------------------------------
+* Subroutine    : Update coins
+* Description   : Update coins
+*-----------------------------------------------------------
+UPDATE_COINS:
+    BSR MOVE_COINS
+
+    RTS
+
+*-----------------------------------------------------------
+* Subroutine    : Move coins
+* Description   : move array of coins
+*-----------------------------------------------------------
+MOVE_COINS:
+
+    LEA COIN_ARRAY_X, A0
+
+    MOVE.B #MAX_NUM_COINS,D0
+    SUB.B #1, D0 ;MAX_COINS - 1
+
+MOVE_COIN_LOOP:
+
+    MOVE.L COIN_VELOCITY, D1
+    ADD.L (A0), D1          ;Add coin x pos with velocity
+    MOVE.L D1, (A0)+        ;Move new xPos to coin x position and increment pointer
+
+    DBRA D0,MOVE_COIN_LOOP
+
+    RTS
 
 *-----------------------------------------------------------
 * Subroutine    : Draw
@@ -638,7 +672,7 @@ DRAW_COINS:
     MOVE.B  #80,        D0          ; Task for Background Color
     TRAP    #15                     ; Trap (Perform action)
 
-     CLR D0
+    CLR D0
     CLR D1
     CLR D2
     CLR D3
@@ -653,12 +687,12 @@ DRAW_COINS:
     SUB.B #1,D5     ;Our index which is MAX_COINS - 1
 
 DRAW_COIN_LOOP:
-    MOVE.B (A0), D1     ;Coin X Pos
-    MOVE.B (A1), D2     ;Coin Y Pos
-    MOVE.B (A0)+, D3     ;Coin X Pos that we will add width onto and increment pointer
-    ADD.B #COIN_W_INIT, D3
-    MOVE.B (A1)+, D4     ;Coin Y Pos that we will add height onto and increment pointer
-    ADD.B #COIN_H_INIT, D4
+    MOVE.L (A0), D1     ;Coin X Pos
+    MOVE.L (A1), D2     ;Coin Y Pos
+    MOVE.L (A0)+, D3     ;Coin X Pos that we will add width onto and increment pointer
+    ADD.L #COIN_W_INIT, D3
+    MOVE.L (A1)+, D4     ;Coin Y Pos that we will add height onto and increment pointer
+    ADD.L #COIN_H_INIT, D4
 
     ; Draw Coin
     MOVE.B  #87,        D0          ; Draw Player
@@ -760,8 +794,8 @@ ENEMY_X         DS.L    01
 ENEMY_Y         DS.L    01
 ENEMY_VELOCITY  DS.L    01
 
-COIN_ARRAY_X    DC.B   00,00,00,00,00  ;Reserve space for 5 coins xPos
-COIN_ARRAY_Y    DC.B   00,00,00,00,00  ;Reserve space for 5 coins yPos
+COIN_ARRAY_X    DC.L   01,01,01,01,01 ;Reserve space for 5 coins xPos
+COIN_ARRAY_Y    DC.L   01,01,01,01,01  ;Reserve space for 5 coins yPos
 COIN_VELOCITY   DS.L    01
 
 PLYR_VELOCITY   DS.L    01  ; Reserve Space for Player Velocity
