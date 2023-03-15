@@ -250,7 +250,7 @@ CHECK_SINGLE_COIN_COLLISION:
     BLE     COLLISION_CHECK_DONE  ; If no overlap, skip to next coin
 
     MOVE.L  PLAYER_X, D1          ; Move player X to D1
-    MOVE.L  (A1)+, D2              ; Move coin X to D2
+    MOVE.L  (A1), D2              ; Move coin X to D2
     ADD.L   #PLYR_W_INIT, D1       ; Add player width to D1
     CMP.L   D1, D2                ; Check if there's overlap on X axis
     BGE     COLLISION_CHECK_DONE  ; If no overlap, skip to next coin
@@ -262,7 +262,7 @@ CHECK_SINGLE_COIN_COLLISION:
     BLE     COLLISION_CHECK_DONE  ; If no overlap, skip to next coin
 
     MOVE.L  PLAYER_Y, D1          ; Move player Y to D1
-    MOVE.L  (A2)+, D2              ; Move coin Y to D2
+    MOVE.L  (A2), D2              ; Move coin Y to D2
     ADD.L   #PLYR_H_INIT, D1       ; Add player height to D1
     CMP.L   D1, D2                ; Check if there's overlap on Y axis
     BGE     COLLISION_CHECK_DONE  ; If no overlap, skip to next coin
@@ -271,6 +271,8 @@ CHECK_SINGLE_COIN_COLLISION:
     BSR     PLAY_OPPS               ; Play Opps Wav
 
 COLLISION_CHECK_DONE:
+    ADD.W #4, A1 ;next coin memory address
+    ADD.W #4, A2
     DBRA D0, CHECK_SINGLE_COIN_COLLISION ; Check next coin
     RTS ; Return to caller
 
@@ -908,6 +910,7 @@ RUN_WAV         DC.B    'run.wav',0         ; Run Sound
 OPPS_WAV        DC.B    'opps.wav',0        ; Collision Opps
 
     END    START        ; last line of source
+
 *~Font name~Courier New~
 *~Font size~10~
 *~Tab type~1~
