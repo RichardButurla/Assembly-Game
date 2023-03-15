@@ -48,8 +48,8 @@ ENEMY_DEFAULT_VELOCITY  EQU     -5
 
 MAX_NUM_COINS       EQU     05
 COIN_DFLT_VELOCITY  EQU     -3
-COIN_W_INIT         EQU     04
-COIN_H_INIT         EQU     04
+COIN_W_INIT         EQU     40
+COIN_H_INIT         EQU     40
 
 *-----------------------------------------------------------
 * Section       : Game Stats
@@ -147,11 +147,11 @@ INITIALISE:
     LEA     COIN_ARRAY_X, A1
     LEA     COIN_ARRAY_Y, A0
 
-    MOVE.L #20,D3 ; move 20 into d3, this will be used for coins y positions
+    MOVE.L #100,D3 ; move 20 into d3, this will be used for coins y positions
 FOR_LOOP: 
 
     MOVE.L D3,(A0)+ ;move d3(20) into A0 and increment A0 to next coin
-    ADD.L  #20,D3   ;add 20 to d3, loop will make coin y positions look like 20,40,60,etc
+    ADD.L  #70,D3   ;add 20 to d3, loop will make coin y positions look like 20,40,60,etc
 
     MOVE.L #200,(A1)+ ;move element decimal 200 into A1 and increment A1 to next coin
 
@@ -222,8 +222,57 @@ UPDATE:
     BSR     UPDATE_PLAYER
     BSR     UPDATE_ENEMY
     BSR     UPDATE_COINS
+    BSR     CHECK_COIN_COLLISIONS
     RTS                             ; Return to subroutine  
 
+
+
+CHECK_COIN_COLLISIONS:
+    LEA COIN_ARRAY_X, A1 ; Load coin X array into address register
+    LEA COIN_ARRAY_Y, A2 ; Load coin Y array into address register
+
+    MOVE.W #MAX_NUM_COINS, D0
+    SUB.W #1,D0
+
+CHECK_SINGLE_COIN_COLLISION:
+    CLR.L D1
+    CLR.L D2
+
+    ; Check collision for a single coin
+    ; PLAYER_X <= COIN_X + COIN_W &&
+    ; PLAYER_X + PLAYER_W >= COIN_X &&
+    ; PLAYER_Y <= COIN_Y + COIN_H &&
+    ; PLAYER_H + PLAYER_Y >= COIN_Y
+    MOVE.L  PLAYER_X, D1          ; Move player X to D1
+    MOVE.L  (A1), D2              ; Move coin X to D2
+    ADD.L   #COIN_W_INIT, D2      ; Add coin width to D2
+    CMP.L   D1, D2                ; Check if there's overlap on X axis
+    BLE     COLLISION_CHECK_DONE  ; If no overlap, skip to next coin
+
+    MOVE.L  PLAYER_X, D1          ; Move player X to D1
+    MOVE.L  (A1)+, D2              ; Move coin X to D2
+    ADD.L   #PLYR_W_INIT, D1       ; Add player width to D1
+    CMP.L   D1, D2                ; Check if there's overlap on X axis
+    BGE     COLLISION_CHECK_DONE  ; If no overlap, skip to next coin
+
+    MOVE.L  PLAYER_Y, D1          ; Move player Y to D1
+    MOVE.L  (A2), D2              ; Move coin Y to D2
+    ADD.L  #COIN_H_INIT, D2      ; Add coin height to D2
+    CMP.L   D1, D2                ; Check if there's overlap on Y axis
+    BLE     COLLISION_CHECK_DONE  ; If no overlap, skip to next coin
+
+    MOVE.L  PLAYER_Y, D1          ; Move player Y to D1
+    MOVE.L  (A2)+, D2              ; Move coin Y to D2
+    ADD.L   #PLYR_H_INIT, D1       ; Add player height to D1
+    CMP.L   D1, D2                ; Check if there's overlap on Y axis
+    BGE     COLLISION_CHECK_DONE  ; If no overlap, skip to next coin
+
+    ; There's a collision, update points
+    BSR     PLAY_OPPS               ; Play Opps Wav
+
+COLLISION_CHECK_DONE:
+    DBRA D0, CHECK_SINGLE_COIN_COLLISION ; Check next coin
+    RTS ; Return to caller
 
 *-----------------------------------------------------------
 * Subroutine    : Update player
@@ -335,45 +384,9 @@ CHECK_COIN_POS_LOOP:
 * Description   : Resets coins
 *-----------------------------------------------------------
 RESET_COIN:
-    CLR.L   D1                      ; Clear contents of D1 (XOR is faster)
-    CLR.L   D3                      ; Clear contents of D1 (XOR is faster)
-    MOVE.W  SCREEN_W,   D1          ; Place Screen width in D1
-    MOVE.L  D1,         (A0)      ; Coin X Position
-
-    CLR.L       D0
-    CLR.L       D1
-    CLR.L       D3
-    MOVE.B      #8, D0         ;Access time since midnight
-    TRAP        #15
-    AND.L       #$7FFFF,D1    ;prevent overflow in divu
-    DIVU        #10, D1
-    SWAP        D1
-    ADDQ.W      #1, D1        ;
-    MOVE        D1, D3 
-
-    ;another new rand number
-    CLR.L       D0
-    CLR.L       D1
-    CLR.L       D4
-    MOVE.B      #8, D0         ;Access time since midnight
-    TRAP        #15
-    AND.L       #$7FFFF,D1    ;prevent overflow in divu
-    DIVU        #10, D1
-    SWAP        D1
-    ADDQ.W      #1, D1        ;
-    MOVE        D1, D4 
-    ADD.W      #10,D4
-
-    CLR.L         D0
-    CLR.L         D1
-    MOVE.L      SCREEN_H,D0
-    CLR.W         D0
-    SWAP        D0
-    MOVE.L      #COIN_H_INIT,D1
-    SUB.L       D1,D0   ;take coin Y size from Screen Height
-    DIVS.W        D4 ,D0  ;divide by 2nd rand num
-    MULS.W        D3,D0   ;multiply by random number
-    MOVE.L      D0,(A1) ;set new Y Pos
+    CLR.L   D1
+    MOVE.W  SCREEN_W, D1
+    MOVE.L  D1, (A0)
 
     RTS
 
@@ -381,11 +394,6 @@ RESET_COIN:
 * Subroutine    : Randomise Coin Y Pos
 * Description   : randomises a y position for a coin
 *-----------------------------------------------------------
-RAND_COIN_Y_POS:
-    ;Will give us 0-9 + 1
-   
-
-    RTS
 
 *-----------------------------------------------------------
 * Subroutine    : Move coins
@@ -648,7 +656,7 @@ SET_OFF_GROUND:
 JUMP:
     BSR     PERFORM_JUMP            ; Do Jump
 PERFORM_JUMP:
-    BSR     PLAY_JUMP               ; Play jump sound
+    ;BSR     PLAY_JUMP               ; Play jump sound
     MOVE.L  #PLYR_JUMP_V,PLYR_VELOCITY ; Set the players velocity to true
     RTS                             ; Return to subroutine
 
