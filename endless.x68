@@ -51,6 +51,11 @@ COIN_DFLT_VELOCITY  EQU     -3
 COIN_W_INIT         EQU     40
 COIN_H_INIT         EQU     40
 
+MAX_NUM_PLATFORMS       EQU     03
+PLATFORM_DFLT_VELOCITY  EQU     -4
+PLATFORM_W_INIT         EQU     100
+PLATFORM_H_INIT         EQU     20
+
 *-----------------------------------------------------------
 * Section       : Game Stats
 * Description   : Points
@@ -148,14 +153,80 @@ INITIALISE:
     LEA     COIN_ARRAY_Y, A0
 
     MOVE.L #100,D3 ; move 20 into d3, this will be used for coins y positions
-FOR_LOOP: 
+COIN_FOR_LOOP: 
 
     MOVE.L D3,(A0)+ ;move d3(20) into A0 and increment A0 to next coin
     ADD.L  #70,D3   ;add 20 to d3, loop will make coin y positions look like 20,40,60,etc
 
     MOVE.L #200,(A1)+ ;move element decimal 200 into A1 and increment A1 to next coin
 
-    DBRA      D1,FOR_LOOP
+    DBRA      D1,COIN_FOR_LOOP
+
+    ;initialise Platforms
+    CLR.L D0
+    CLR.L D1
+
+    MOVE.L #PLATFORM_DFLT_VELOCITY, D0
+    MOVE.L D0, PLATFORM_VELOCITY
+
+    CLR.L D0
+    CLR.L D1
+
+    ; initialise the 3 positions
+    MOVE.L SCREEN_H, D0
+    CLR.W D0
+    SWAP D0
+    MOVE.L #MAX_NUM_PLATFORMS,D1
+    DIVU   D1,D0
+    ;Divides and puts 3 possible positions into platforms pso. ie, 300 / 3 = 100. We want 100,200,300
+    MOVE.L D0, PLATFORM_Y_POS_1
+    MOVE.L D0, PLATFORM_Y_POS_2
+    ADD.L  D0,PLATFORM_Y_POS_2
+    MOVE.L D0, PLATFORM_Y_POS_3
+    ADD.L  D0,PLATFORM_Y_POS_3
+    ADD.L  D0,PLATFORM_Y_POS_3
+    ;Platform 3 is off screen so bring all platforms up
+    MOVE.L PLATFORM_Y_POS_1, D1
+    DIVU   #2, D0
+    SUB.L D0, D1
+    MOVE.L D1, PLATFORM_Y_POS_1    	
+
+    MOVE.L PLATFORM_Y_POS_2, D1
+    DIVU   #2, D0
+    SUB.L D0, D1
+    MOVE.L D1, PLATFORM_Y_POS_2  
+
+    MOVE.L PLATFORM_Y_POS_3, D1
+    DIVU   #2, D0
+    SUB.L D0, D1
+    MOVE.L D1, PLATFORM_Y_POS_3  
+
+    CLR.L D0
+    CLR.L D1
+    CLR.L D2
+
+    ;Set platform Positions
+
+    MOVE.B #MAX_NUM_PLATFORMS, D0
+    SUB.B #1,D0
+
+    LEA PLATFORM_ARRAY_X, A0
+    LEA PLATFORM_ARRAY_Y, A1
+
+    MOVE.W SCREEN_W, D2
+    SUB.W  #50, D2
+    MOVE.L D2, (A0)+
+    MOVE.L PLATFORM_Y_POS_1, D1
+    MOVE.L D1, (A1)+
+
+    MOVE.L D2, (A0)+
+    MOVE.L PLATFORM_Y_POS_2, D1
+    MOVE.L D1, (A1)+
+
+    MOVE.L D2, (A0)+
+    MOVE.L PLATFORM_Y_POS_3, D1
+    MOVE.L D1, (A1)
+
 
     ;Initialize Delta Time
     CLR.L D1
@@ -222,7 +293,9 @@ UPDATE:
     BSR     UPDATE_PLAYER
     BSR     UPDATE_ENEMY
     BSR     UPDATE_COINS
+    BSR     UPDATE_PLATFORMS
     BSR     CHECK_COIN_COLLISIONS
+    BSR     CHECK_PLATFORM_COLLISIONS
     RTS                             ; Return to subroutine  
 
 
@@ -418,6 +491,131 @@ MOVE_COIN_LOOP:
 
     RTS
 
+
+*-----------------------------------------------------------
+* Subroutine    : Update platforms
+* Description   : Update coins
+*-----------------------------------------------------------
+UPDATE_PLATFORMS:
+    BSR MOVE_PLATFORMS
+    BSR CHECK_PLATFORM_POSITIONS
+
+    RTS
+
+*-----------------------------------------------------------
+* Subroutine    : Checks PLATFORMs Positions
+* Description   : Checks PLATFORMs Positions
+*-----------------------------------------------------------
+CHECK_PLATFORM_POSITIONS:
+    CLR.L D0
+    CLR.L D1
+    LEA PLATFORM_ARRAY_X, A0
+    LEA PLATFORM_ARRAY_Y, A1
+
+
+    MOVE.B #MAX_NUM_PLATFORMS,D0
+    SUB.B #1, D0 ;MAX_PLATFORMS - 1
+
+CHECK_PLATFORM_POS_LOOP:
+    CMP.L   #00,     (A0)
+    BLE     RESET_PLATFORM   ; Reset PLATFORM if off Screen
+
+    ADD    #4,A0         ; increment A0 by 4 memory locations. The next PLATFORMArrayX which is a Long
+    ADD    #4,A1         ; increment A0 by 4 memory locations. The next PLATFORMArrayX which is a Long
+    DBRA D0,CHECK_PLATFORM_POS_LOOP
+    
+
+    RTS
+
+*-----------------------------------------------------------
+* Subroutine    : Resets PLATFORMS
+* Description   : Resets PLATFORMS
+*-----------------------------------------------------------
+RESET_PLATFORM:
+    CLR.L   D1
+    MOVE.W  SCREEN_W, D1
+    MOVE.L  D1, (A0)
+
+    RTS
+
+*-----------------------------------------------------------
+* Subroutine    : Randomise PLATFORM Y Pos
+* Description   : randomises a y position for a PLATFORM
+*-----------------------------------------------------------
+
+*-----------------------------------------------------------
+* Subroutine    : Move PLATFORMS
+* Description   : move array of PLATFORMS
+*-----------------------------------------------------------
+MOVE_PLATFORMS:
+
+    LEA PLATFORM_ARRAY_X, A0
+    CLR.L D0
+
+    MOVE.B #MAX_NUM_PLATFORMS,D0
+    SUB.B #1, D0 ;MAX_PLATFORMS - 1
+
+MOVE_PLATFORM_LOOP:
+
+    MOVE.L PLATFORM_VELOCITY, D1
+    ADD.L (A0), D1          ;Add PLATFORM x pos with velocity
+    MOVE.L D1, (A0)+        ;Move new xPos to PLATFORM x position and increment pointer
+
+    DBRA D0,MOVE_PLATFORM_LOOP
+
+    RTS
+
+
+*-----------------------------------------------------------
+* Subroutine    : Check Platform Collisions
+* Description   : Check Collisions between player and platform to correctly place player
+*-----------------------------------------------------------
+CHECK_PLATFORM_COLLISIONS:
+    CLR.L D0
+    CLR.L D1
+    CLR.L D2
+    LEA PLATFORM_ARRAY_X, A1
+    LEA PLATFORM_ARRAY_Y, A2
+
+    ;check if players y verlocity is going down
+    MOVE.L PLYR_VELOCITY,D0
+    CMP #0,D0
+    BGT CHECK_ABOVE_COLLISION
+
+    BSR CHECK_BELOW_COLLISION
+    ;if less than 1 check collision
+
+    RTS
+
+CHECK_ABOVE_COLLISION:
+;if player y + height < platform y check next overlap,
+    MOVE.L PLAYER_Y, D1
+    ADD.L #PLYR_H_INIT,D1
+    MOVE.L (A2), D2
+    CMP D2, D1
+    BLE PLATFORM_COLLISION_CHECK_DONE ;If player y + h is less than platform y, there is no collision
+
+    ;check next overlap
+    MOVE.L PLAYER_Y, D1
+    MOVE.L (A2), D2
+    ADD.L #PLATFORM_H_INIT,D2
+    CMP D2, D1
+    BGE PLATFORM_COLLISION_CHECK_DONE ;If coin y + h is less than player y, there is no collision
+
+    ;Collision happened
+    ;set player vel y to 0 and reposition
+    MOVE.L #0,D0 ;;Player Yvel = 0
+    MOVE.L (A2), D1 ;player y pos == platform y Pos
+    MOVE.L D1, PLAYER_Y
+    BSR PLAY_OPPS
+
+    RTS 
+
+CHECK_BELOW_COLLISION:
+RTS
+
+PLATFORM_COLLISION_CHECK_DONE:
+    RTS
 *-----------------------------------------------------------
 * Subroutine    : Draw
 * Description   : Draw Screen
@@ -436,6 +634,7 @@ DRAW:
     BSR     DRAW_PLAYER             ; Draw Player
     BSR     DRAW_ENEMY
     BSR     DRAW_COINS
+    BSR     DRAW_PLATFORMS
     RTS                             ; Return to subroutine
 
 *-----------------------------------------------------------
@@ -796,6 +995,47 @@ DRAW_COIN_LOOP:
 
     RTS
 
+
+    *-----------------------------------------------------------
+* Subroutine    : Draw Platforms
+* Description   : Draw Platform Rectangles
+*-----------------------------------------------------------
+DRAW_PLATFORMS:
+
+    ; Set Pixel Colors
+    MOVE.L  #GREEN,     D1          ; Set Background color
+    MOVE.B  #80,        D0          ; Task for Background Color
+    TRAP    #15                     ; Trap (Perform action)
+
+    CLR.L D0
+    CLR.L D1
+    CLR.L D2
+    CLR.L D3
+    CLR.L D4
+    CLR.L D5
+
+    ; Set X, Y, Width and Height
+    LEA     PLATFORM_ARRAY_X, A0
+    LEA     PLATFORM_ARRAY_Y, A1
+
+    MOVE.B #MAX_NUM_PLATFORMS, D5
+    SUB.B #1,D5     ;Our index which is MAX_PLATFORMS - 1
+
+DRAW_PLATFORM_LOOP:
+    MOVE.L (A0), D1     ;Platform X Pos
+    MOVE.L (A1), D2     ;Paltform Y Pos
+    MOVE.L (A0)+, D3     ;Platform X Pos that we will add width onto and increment pointer
+    ADD.L #PLATFORM_W_INIT, D3
+    MOVE.L (A1)+, D4     ;Platform Y Pos that we will add height onto and increment pointer
+    ADD.L #PLATFORM_H_INIT, D4
+
+    ; Draw Platform
+    MOVE.B  #87,        D0          ; Draw Platform
+    TRAP    #15                     ; Trap (Perform action)
+
+    DBRA D5,DRAW_PLATFORM_LOOP
+
+    RTS
 *-----------------------------------------------------------
 * Subroutine    : Draw Enemy
 * Description   : Draw Enemy Square
@@ -862,6 +1102,7 @@ EXIT_MSG        DC.B    'Exiting....', 0    ; Exit Message
 WHITE           EQU     $00FFFFFF
 RED             EQU     $000000FF
 YELLOW          EQU     $0000FFFF
+GREEN           EQU     $00FF00FF
 
 *-----------------------------------------------------------
 * Section       : Screen Size
@@ -892,9 +1133,17 @@ COIN_ARRAY_X    DC.L   01,01,01,01,01 ;Reserve space for 5 coins xPos
 COIN_ARRAY_Y    DC.L   01,01,01,01,01  ;Reserve space for 5 coins yPos
 COIN_VELOCITY   DS.L    01
 
+PLATFORM_ARRAY_X    DC.L   01,01,01 ;Reserve space for 3 platforms xPos
+PLATFORM_ARRAY_Y    DC.L   01,01,01  ;Reserve space for 3 platforms yPos
+PLATFORM_VELOCITY   DS.L   01
+PLATFORM_Y_POS_1      DS.L   01
+PLATFORM_Y_POS_2      DS.L   01
+PLATFORM_Y_POS_3      DS.L   01
+
 PLYR_VELOCITY   DS.L    01  ; Reserve Space for Player Velocity
 PLYR_GRAVITY    DS.L    01  ; Reserve Space for Player Gravity
 PLYR_ON_GND     DS.L    01  ; Reserve Space for Player on Ground
+
 
 DELTA_TIME      DS.L    01  ; Reserve Space for Delta Time
 
