@@ -588,6 +588,18 @@ CHECK_PLATFORM_COLLISIONS:
     RTS
 
 CHECK_ABOVE_COLLISION:
+
+    MOVE.L  PLAYER_X, D1          ; Move player X to D1
+    MOVE.L  (A1), D2              ; Move platform X to D2
+    ADD.L   #PLATFORM_W_INIT, D2      ; Add platform width to D2
+    CMP.L   D1, D2                ; Check if there's overlap on X axis
+    BLE     PLATFORM_COLLISION_CHECK_DONE  ; If no overlap, skip to next platform
+
+    MOVE.L  PLAYER_X, D1          ; Move player X to D1
+    MOVE.L  (A1), D2              ; Move platform X to D2
+    ADD.L   #PLYR_W_INIT, D1       ; Add player width to D1
+    CMP.L   D1, D2                ; Check if there's overlap on X axis
+    BGE     PLATFORM_COLLISION_CHECK_DONE  ; If no overlap, skip to next platform
 ;if player y + height < platform y check next overlap,
     MOVE.L PLAYER_Y, D1
     ADD.L #PLYR_H_INIT,D1
@@ -604,8 +616,9 @@ CHECK_ABOVE_COLLISION:
 
     ;Collision happened
     ;set player vel y to 0 and reposition
-    MOVE.L #0,D0 ;;Player Yvel = 0
+    MOVE.L #0,PLYR_VELOCITY ;;Player Yvel = 0
     MOVE.L (A2), D1 ;player y pos == platform y Pos
+    SUB.L #PLYR_H_INIT, D1 ; offset player above platform
     MOVE.L D1, PLAYER_Y
     BSR PLAY_OPPS
 
