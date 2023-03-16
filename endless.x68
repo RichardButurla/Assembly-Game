@@ -26,11 +26,11 @@ TC_EXIT     EQU         09          ; Exit Trapcode
 * Description   : Size of Player and Enemy and properties
 * of these characters e.g Starting Positions and Sizes
 *-----------------------------------------------------------
-PLYR_W_INIT EQU         08          ; Players initial Width
-PLYR_H_INIT EQU         08          ; Players initial Height
+PLYR_W_INIT EQU         15          ; Players initial Width
+PLYR_H_INIT EQU         15          ; Players initial Height
 
 PLYR_DFLT_V EQU         00          ; Default Player Velocity
-PLYR_JUMP_V EQU        -10          ; Player Jump Velocity
+PLYR_JUMP_V EQU        -20          ; Player Jump Velocity
 PLYR_DFLT_G EQU         01          ; Player Default Gravity
 PLYR_MOVE_X_VEL EQU     01      ;Player X Velocity
 PLYR_MOVE_Y_VEL EQU     01      ;Player X Velocity
@@ -40,7 +40,7 @@ GND_FALSE   EQU         00          ; Player on Ground False
 
 RUN_INDEX   EQU         00          ; Player Run Sound Index  
 JMP_INDEX   EQU         01          ; Player Jump Sound Index  
-OPPS_INDEX  EQU         02          ; Player Opps Sound Index
+COIN_INDEX  EQU         02          ; Player Opps Sound Index
 
 ENMY_W_INIT EQU         08          ; Enemy initial Width
 ENMY_H_INIT EQU         128          ; Enemy initial Height
@@ -48,8 +48,8 @@ ENEMY_DEFAULT_VELOCITY  EQU     -5
 
 MAX_NUM_COINS       EQU     05
 COIN_DFLT_VELOCITY  EQU     -3
-COIN_W_INIT         EQU     40
-COIN_H_INIT         EQU     40
+COIN_W_INIT         EQU     5
+COIN_H_INIT         EQU     5
 
 MAX_NUM_PLATFORMS       EQU     03
 PLATFORM_DFLT_VELOCITY  EQU     -4
@@ -83,7 +83,7 @@ INITIALISE:
     ; Initialise Sounds
     BSR     RUN_LOAD                ; Load Run Sound into Memory
     BSR     JUMP_LOAD               ; Load Jump Sound into Memory
-    BSR     OPPS_LOAD               ; Load Opps (Collision) Sound into Memory
+    BSR     COIN_LOAD               ; Load Opps (Collision) Sound into Memory
 
     ; Screen Size
     MOVE.B  #TC_SCREEN, D0          ; access screen information
@@ -153,12 +153,14 @@ INITIALISE:
     LEA     COIN_ARRAY_Y, A0
 
     MOVE.L #100,D3 ; move 20 into d3, this will be used for coins y positions
+    MOVE.L #100,D2
 COIN_FOR_LOOP: 
 
     MOVE.L D3,(A0)+ ;move d3(20) into A0 and increment A0 to next coin
     ADD.L  #70,D3   ;add 20 to d3, loop will make coin y positions look like 20,40,60,etc
 
-    MOVE.L #200,(A1)+ ;move element decimal 200 into A1 and increment A1 to next coin
+    MOVE.L D2,(A1)+ ;move element decimal 200 into A1 and increment A1 to next coin
+    ADD.L #250,D2
 
     DBRA      D1,COIN_FOR_LOOP
 
@@ -343,7 +345,10 @@ CHECK_SINGLE_COIN_COLLISION:
     BGE     COLLISION_CHECK_DONE  ; If no overlap, skip to next coin
 
     ; There's a collision, update points
-    BSR     PLAY_OPPS               ; Play Opps Wav
+    BSR     PLAY_COIN               ; Play Opps Wav
+    MOVE.W  SCREEN_W,   D3         ; Place Screen width in D1
+    MOVE.L  D3,         (A1)     ; COIN X Position
+
 
 COLLISION_CHECK_DONE:
     ADD.W #4, A1 ;next coin memory address
@@ -628,7 +633,6 @@ CHECK_ABOVE_COLLISION:
     MOVE.L (A2), D1 ;player y pos == platform y Pos
     SUB.L #PLYR_H_INIT, D1 ; offset player above platform
     MOVE.L D1, PLAYER_Y
-    BSR PLAY_OPPS
 
 PLATFORM_COLLISION_CHECK_DONE:
     ADD.W #4, A1 ;next platform memory address
@@ -942,15 +946,15 @@ PLAY_JUMP:
     TRAP    #15                     ; Trap (Perform action)
     RTS                             ; Return to subroutine
 
-OPPS_LOAD:
-    LEA     OPPS_WAV,   A1          ; Load Wav File into A1
-    MOVE    #OPPS_INDEX,D1          ; Assign it INDEX
+COIN_LOAD:
+    LEA     COIN_WAV,   A1          ; Load Wav File into A1
+    MOVE    #COIN_INDEX,D1          ; Assign it INDEX
     MOVE    #71,        D0          ; Load into memory
     TRAP    #15                     ; Trap (Perform action)
     RTS                             ; Return to subroutine
 
-PLAY_OPPS:
-    MOVE    #OPPS_INDEX,D1          ; Load Sound INDEX
+PLAY_COIN:
+    MOVE    #COIN_INDEX,D1          ; Load Sound INDEX
     MOVE    #72,        D0          ; Play Sound
     TRAP    #15                     ; Trap (Perform action)
     RTS                             ; Return to subroutine
@@ -1180,7 +1184,7 @@ DELTA_TIME      DS.L    01  ; Reserve Space for Delta Time
 *-----------------------------------------------------------
 JUMP_WAV        DC.B    'jump.wav',0        ; Jump Sound
 RUN_WAV         DC.B    'run.wav',0         ; Run Sound
-OPPS_WAV        DC.B    'opps.wav',0        ; Collision Opps
+COIN_WAV        DC.B    'coin.wav',0        ; Collision Opps
 
     END    START        ; last line of source
 
