@@ -574,12 +574,18 @@ CHECK_PLATFORM_COLLISIONS:
     CLR.L D0
     CLR.L D1
     CLR.L D2
+    CLR.L D3
     LEA PLATFORM_ARRAY_X, A1
     LEA PLATFORM_ARRAY_Y, A2
 
     ;check if players y verlocity is going down
     MOVE.L PLYR_VELOCITY,D0
     CMP #0,D0
+    MOVE.L #MAX_NUM_PLATFORMS, D3
+    SUB.L #1, D3
+
+CHECK_SINGLE_PLATFORM_COLLISION:
+
     BGT CHECK_ABOVE_COLLISION
 
     BSR CHECK_BELOW_COLLISION
@@ -622,13 +628,16 @@ CHECK_ABOVE_COLLISION:
     MOVE.L D1, PLAYER_Y
     BSR PLAY_OPPS
 
-    RTS 
+PLATFORM_COLLISION_CHECK_DONE:
+    ADD.W #4, A1 ;next platform memory address
+    ADD.W #4, A2
+    DBRA D3, CHECK_SINGLE_PLATFORM_COLLISION
+    RTS ; Return to caller
 
 CHECK_BELOW_COLLISION:
 RTS
 
-PLATFORM_COLLISION_CHECK_DONE:
-    RTS
+
 *-----------------------------------------------------------
 * Subroutine    : Draw
 * Description   : Draw Screen
