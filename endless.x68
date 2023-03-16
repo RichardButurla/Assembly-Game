@@ -38,6 +38,8 @@ PLYR_MOVE_Y_VEL EQU     01      ;Player X Velocity
 GND_TRUE    EQU         01          ; Player on Ground True
 GND_FALSE   EQU         00          ; Player on Ground False
 
+GAME_OVER_TRUE    EQU   01
+
 RUN_INDEX   EQU         00          ; Player Run Sound Index  
 JMP_INDEX   EQU         01          ; Player Jump Sound Index  
 COIN_INDEX  EQU         02          ; Player Opps Sound Index
@@ -48,8 +50,8 @@ ENEMY_DEFAULT_VELOCITY  EQU     -5
 
 MAX_NUM_COINS       EQU     05
 COIN_DFLT_VELOCITY  EQU     -3
-COIN_W_INIT         EQU     5
-COIN_H_INIT         EQU     5
+COIN_W_INIT         EQU     08
+COIN_H_INIT         EQU     08
 
 MAX_NUM_PLATFORMS       EQU     03
 PLATFORM_DFLT_VELOCITY  EQU     -4
@@ -84,6 +86,8 @@ INITIALISE:
     BSR     RUN_LOAD                ; Load Run Sound into Memory
     BSR     JUMP_LOAD               ; Load Jump Sound into Memory
     BSR     COIN_LOAD               ; Load Opps (Collision) Sound into Memory
+
+    MOVE.B #0,GAME_IS_OVER          ; False
 
     ; Screen Size
     MOVE.B  #TC_SCREEN, D0          ; access screen information
@@ -229,6 +233,7 @@ COIN_FOR_LOOP:
     SUB.W  #200, D2 ;Offset back a bit
     MOVE.L D2, (A0)
     MOVE.L PLATFORM_Y_POS_3, D1
+    SUB.L #60,D1
     MOVE.L D1, (A1)
 
 
@@ -346,6 +351,8 @@ CHECK_SINGLE_COIN_COLLISION:
 
     ; There's a collision, update points
     BSR     PLAY_COIN               ; Play Opps Wav
+    CLR.L D4
+    ADD.L #1,PLAYER_SCORE
     MOVE.W  SCREEN_W,   D3         ; Place Screen width in D1
     MOVE.L  D3,         (A1)     ; COIN X Position
 
@@ -691,13 +698,55 @@ DRAW:
     MOVE.B	#TC_CURSR_P,D0          ; Set Cursor Position
 	MOVE.W	#$FF00,     D1          ; Clear contents
 	TRAP    #15                     ; Trap (Perform action)
+    
+    CLR.L D1
+    CLR.L D2
+    MOVE.B GAME_IS_OVER,D1
+    MOVE.B #GAME_OVER_TRUE,D2
+    CMP D1,D2
+    BNE DRAW_IN_GAME
+    
+    BSR DRAW_GAME_OVER_DATA
+    RTS
 
+DRAW_IN_GAME:
     BSR     DRAW_PLYR_DATA          ; Draw Draw Score, HUD, Player X and Y
     BSR     DRAW_PLAYER             ; Draw Player
     BSR     DRAW_ENEMY
     BSR     DRAW_COINS
     BSR     DRAW_PLATFORMS
+    
     RTS                             ; Return to subroutine
+
+    *-----------------------------------------------------------
+* Subroutine    : Draw Game Over Data
+* Description   : Draw Game over text and final score text + score
+*-----------------------------------------------------------
+DRAW_GAME_OVER_DATA:
+    ; Game Over Message
+    MOVE.B  #TC_CURSR_P,D0          ; Set Cursor Position
+    MOVE.W  #$2210,     D1          ; Col 20, Row 20
+    TRAP    #15                     ; Trap (Perform action)
+    LEA     GAME_OVER_MESSAGE,  A1          ; Score Message
+    MOVE    #13,        D0          ; No Line feed
+    TRAP    #15                     ; Trap (Perform action
+
+    MOVE.B  #TC_CURSR_P,D0          ; Set Cursor Position
+    MOVE.W  #$2212,     D1          ; Col 20, Row 20
+    TRAP    #15                     ; Trap (Perform action)
+    LEA     FINAL_SCORE_MESSAGE,  A1          ; Score Message
+    MOVE    #13,        D0          ; No Line feed
+    TRAP    #15                     ; Trap (Perform action
+
+    ; Player Score Value
+    MOVE.B  #TC_CURSR_P,D0          ; Set Cursor Position
+    MOVE.W  #$2912,     D1          ; Col 09, Row 01
+    TRAP    #15                     ; Trap (Perform action)
+    MOVE.B  #03,        D0          ; Display number at D1.L
+    MOVE.L  PLAYER_SCORE,D1         ; Move Score to D1.L
+    TRAP    #15   
+
+    
 
 *-----------------------------------------------------------
 * Subroutine    : Draw Player Data
@@ -721,126 +770,6 @@ DRAW_PLYR_DATA:
     MOVE.B  #03,        D0          ; Display number at D1.L
     MOVE.L  PLAYER_SCORE,D1         ; Move Score to D1.L
     TRAP    #15                     ; Trap (Perform action)
-    
-    ; Player X Message
-    MOVE.B  #TC_CURSR_P,D0          ; Set Cursor Position
-    MOVE.W  #$0202,     D1          ; Col 02, Row 02
-    TRAP    #15                     ; Trap (Perform action)
-    LEA     X_MSG,      A1          ; X Message
-    MOVE    #13,        D0          ; No Line feed
-    TRAP    #15                     ; Trap (Perform action)
-    
-    ; Player X
-    MOVE.B  #TC_CURSR_P, D0          ; Set Cursor Position
-    MOVE.W  #$0502,     D1          ; Col 05, Row 02
-    TRAP    #15                     ; Trap (Perform action)
-    MOVE.B  #03,        D0          ; Display number at D1.L
-    MOVE.L  PLAYER_X,   D1          ; Move X to D1.L
-    TRAP    #15                     ; Trap (Perform action)
-    
-    ; Player Y Message
-    MOVE.B  #TC_CURSR_P,D0          ; Set Cursor Position
-    MOVE.W  #$1002,     D1          ; Col 10, Row 02
-    TRAP    #15                     ; Trap (Perform action)
-    LEA     Y_MSG,      A1          ; Y Message
-    MOVE    #13,        D0          ; No Line feed
-    TRAP    #15                     ; Trap (Perform action)
-    
-    ; Player Y
-    MOVE.B  #TC_CURSR_P,D0          ; Set Cursor Position
-    MOVE.W  #$1202,     D1          ; Col 12, Row 02
-    TRAP    #15                     ; Trap (Perform action)
-    MOVE.B  #03,        D0          ; Display number at D1.L
-    MOVE.L  PLAYER_Y,   D1          ; Move X to D1.L
-    TRAP    #15                     ; Trap (Perform action) 
-
-    ; Player Velocity Message
-    MOVE.B  #TC_CURSR_P,D0          ; Set Cursor Position
-    MOVE.W  #$0203,     D1          ; Col 02, Row 03
-    TRAP    #15                     ; Trap (Perform action)
-    LEA     V_MSG,      A1          ; Velocity Message
-    MOVE    #13,        D0          ; No Line feed
-    TRAP    #15                     ; Trap (Perform action)
-    
-    ; Player Velocity
-    MOVE.B  #TC_CURSR_P,D0          ; Set Cursor Position
-    MOVE.W  #$0503,     D1          ; Col 05, Row 03
-    TRAP    #15                     ; Trap (Perform action)
-    MOVE.B  #03,        D0          ; Display number at D1.L
-    MOVE.L  PLYR_VELOCITY,D1        ; Move X to D1.L
-    TRAP    #15                     ; Trap (Perform action)
-    
-    ; Player Gravity Message
-    MOVE.B  #TC_CURSR_P,D0          ; Set Cursor Position
-    MOVE.W  #$1003,     D1          ; Col 10, Row 03
-    TRAP    #15                     ; Trap (Perform action)
-    LEA     G_MSG,      A1          ; G Message
-    MOVE    #13,        D0          ; No Line feed
-    TRAP    #15                     ; Trap (Perform action)
-    
-    ; Player Gravity
-    MOVE.B  #TC_CURSR_P,D0          ; Set Cursor Position
-    MOVE.W  #$1203,     D1          ; Col 12, Row 03
-    TRAP    #15                     ; Trap (Perform action)
-    MOVE.B  #03,        D0          ; Display number at D1.L
-    MOVE.L  PLYR_GRAVITY,D1         ; Move Gravity to D1.L
-    TRAP    #15                     ; Trap (Perform action)
-
-    ; Player On Ground Message
-    MOVE.B  #TC_CURSR_P,D0          ; Set Cursor Position
-    MOVE.W  #$0204,     D1          ; Col 10, Row 03
-    TRAP    #15                     ; Trap (Perform action)
-    LEA     GND_MSG,    A1          ; On Ground Message
-    MOVE    #13,        D0          ; No Line feed
-    TRAP    #15                     ; Trap (Perform action)
-    
-    ; Player On Ground
-    MOVE.B  #TC_CURSR_P,D0          ; Set Cursor Position
-    MOVE.W  #$0604,     D1          ; Col 06, Row 04
-    TRAP    #15                     ; Trap (Perform action)
-    MOVE.B  #03,        D0          ; Display number at D1.L
-    MOVE.L  PLYR_ON_GND,D1          ; Move Play on Ground ? to D1.L
-    TRAP    #15                     ; Trap (Perform action)
-
-    ; Show Keys Pressed
-    MOVE.B  #TC_CURSR_P,D0          ; Set Cursor Position
-    MOVE.W  #$2001,     D1          ; Col 20, Row 1
-    TRAP    #15                     ; Trap (Perform action)
-    LEA     KEYCODE_MSG, A1         ; Keycode
-    MOVE    #13,        D0          ; No Line feed
-    TRAP    #15                     ; Trap (Perform action)
-
-    ; Show KeyCode
-    MOVE.B  #TC_CURSR_P,D0          ; Set Cursor Position
-    MOVE.W  #$3001,     D1          ; Col 30, Row 1
-    TRAP    #15                     ; Trap (Perform action)    
-    MOVE.L  CURRENT_KEY,D1          ; Move Key Pressed to D1
-    MOVE.B  #03,        D0          ; Display the contents of D1
-    TRAP    #15                     ; Trap (Perform action)
-
-    ; Show if Update is Running
-    MOVE.B  #TC_CURSR_P,D0          ; Set Cursor Position
-    MOVE.W  #$0205,     D1          ; Col 02, Row 05
-    TRAP    #15                     ; Trap (Perform action)
-    LEA     UPDATE_MSG, A1          ; Update
-    MOVE    #13,        D0          ; No Line feed
-    TRAP    #15                     ; Trap (Perform action)
-
-    ; Show if Draw is Running
-    MOVE.B  #TC_CURSR_P,D0          ; Set Cursor Position
-    MOVE.W  #$0206,     D1          ; Col 02, Row 06
-    TRAP    #15                     ; Trap (Perform action)
-    LEA     DRAW_MSG,   A1          ; Draw
-    MOVE    #13,        D0          ; No Line feed
-    TRAP    #15                     ; Trap (Perform action)
-
-    ; Show if Idle is Running
-    MOVE.B  #TC_CURSR_P,D0          ; Set Cursor Position
-    MOVE.W  #$0207,     D1          ; Col 02, Row 07
-    TRAP    #15                     ; Trap (Perform action)
-    LEA     IDLE_MSG,   A1          ; Move Idle Message to A1
-    MOVE    #13,        D0          ; No Line feed
-    TRAP    #15                     ; Trap (Perform action)
 
     RTS  
     
@@ -856,7 +785,7 @@ IS_PLAYER_ON_GND:
     ;DIVU    #02,        D1          ; divide by 2 for center on Y Axis
     SUB.L   #10, D1
     MOVE.L  PLAYER_Y,   D2          ; Player Y Position
-    CMP     D1,         D2          ; Compare middle of Screen with Players Y Position 
+    CMP     D1,         D2          ; Compare bottom of Screen with Players Y Position 
     BGE     SET_ON_GROUND           ; The Player is on the Ground Plane
     BLT     SET_OFF_GROUND          ; The Player is off the Ground
     RTS                             ; Return to subroutine
@@ -876,6 +805,7 @@ SET_ON_GROUND:
     MOVE.L  #00,        D1          ; Player Velocity
     MOVE.L  D1,         PLYR_VELOCITY ; Set Player Velocity
     MOVE.L  #GND_TRUE,  PLYR_ON_GND ; Player is on Ground
+    MOVE.B  #GAME_OVER_TRUE,GAME_IS_OVER
     RTS
 
 *-----------------------------------------------------------
@@ -1050,7 +980,7 @@ DRAW_COIN_LOOP:
     ADD.L #COIN_H_INIT, D4
 
     ; Draw Coin
-    MOVE.B  #87,        D0          ; Draw Player
+    MOVE.B  #88,        D0          ; Draw Player
     TRAP    #15                     ; Trap (Perform action)
 
     DBRA D5,DRAW_COIN_LOOP
@@ -1144,16 +1074,8 @@ EXIT:
 SCORE_MSG       DC.B    'Score : ', 0       ; Score Message
 KEYCODE_MSG     DC.B    'KeyCode : ', 0     ; Keycode Message
 JUMP_MSG        DC.B    'Jump....', 0       ; Jump Message
-
-IDLE_MSG        DC.B    'Idle....', 0       ; Idle Message
-UPDATE_MSG      DC.B    'Update....', 0     ; Update Message
-DRAW_MSG        DC.B    'Draw....', 0       ; Draw Message
-
-X_MSG           DC.B    'X:', 0             ; X Position Message
-Y_MSG           DC.B    'Y:', 0             ; Y Position Message
-V_MSG           DC.B    'V:', 0             ; Velocity Position Message
-G_MSG           DC.B    'G:', 0             ; Gravity Position Message
-GND_MSG         DC.B    'GND:', 0           ; On Ground Position Message
+GAME_OVER_MESSAGE       DC.B    'GAME OVER!',0       ; Score Message
+FINAL_SCORE_MESSAGE       DC.B    'FINAL SCORE: ',0       ; Score Message
 
 EXIT_MSG        DC.B    'Exiting....', 0    ; Exit Message
 
@@ -1205,6 +1127,8 @@ PLATFORM_Y_POS_3      DS.L   01
 PLYR_VELOCITY   DS.L    01  ; Reserve Space for Player Velocity
 PLYR_GRAVITY    DS.L    01  ; Reserve Space for Player Gravity
 PLYR_ON_GND     DS.L    01  ; Reserve Space for Player on Ground
+
+GAME_IS_OVER    DS.L    01  ;Reserve space for game over bool
 
 
 DELTA_TIME      DS.L    01  ; Reserve Space for Delta Time
