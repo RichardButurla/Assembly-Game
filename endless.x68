@@ -583,16 +583,16 @@ CHECK_PLATFORM_COLLISIONS:
     CLR.L D2
     CLR.L D3
     LEA PLATFORM_ARRAY_X, A1
-    LEA PLATFORM_ARRAY_Y, A2
-
-    ;check if players y verlocity is going down
-    MOVE.L PLYR_VELOCITY,D0
-    CMP #0,D0
+    LEA PLATFORM_ARRAY_Y, A2            
     MOVE.L #MAX_NUM_PLATFORMS, D3
     SUB.L #1, D3
 
 CHECK_SINGLE_PLATFORM_COLLISION:
 
+    
+    ;check if players y verlocity is going down
+    MOVE.L PLYR_VELOCITY,D0
+    CMP #0,D0
     BGT CHECK_ABOVE_COLLISION
 
     BSR CHECK_BELOW_COLLISION
@@ -641,7 +641,41 @@ PLATFORM_COLLISION_CHECK_DONE:
     RTS ; Return to caller
 
 CHECK_BELOW_COLLISION:
-RTS
+    MOVE.L  PLAYER_X, D1          ; Move player X to D1
+    MOVE.L  (A1), D2              ; Move platform X to D2
+    ADD.L   #PLATFORM_W_INIT, D2      ; Add platform width to D2
+    CMP.L   D1, D2                ; Check if there's overlap on X axis
+    BLE     PLATFORM_COLLISION_CHECK_DONE  ; If no overlap, skip to next platform
+
+    MOVE.L  PLAYER_X, D1          ; Move player X to D1
+    MOVE.L  (A1), D2              ; Move platform X to D2
+    ADD.L   #PLYR_W_INIT, D1       ; Add player width to D1
+    CMP.L   D1, D2                ; Check if there's overlap on X axis
+    BGE     PLATFORM_COLLISION_CHECK_DONE  ; If no overlap, skip to next platform
+;if player y + height < platform y check next overlap,
+    MOVE.L PLAYER_Y, D1
+    ADD.L #PLYR_H_INIT,D1
+    MOVE.L (A2), D2
+    CMP D2, D1
+    BLE PLATFORM_COLLISION_CHECK_DONE ;If player y + h is less than platform y, there is no collision
+
+    ;check next overlap
+    MOVE.L PLAYER_Y, D1
+    MOVE.L (A2), D2
+    ADD.L #PLATFORM_H_INIT,D2
+    CMP D2, D1
+    BGE PLATFORM_COLLISION_CHECK_DONE ;If coin y + h is less than player y, there is no collision
+
+    ;Collision happened
+    ;set player vel y to 0 and reposition
+    MOVE.L #1,PLYR_VELOCITY ;;Player Yvel = 1
+    MOVE.L (A2), D1 ;player y pos == platform y Pos
+    ADD.L #PLYR_H_INIT, D1 ; offset player below 
+    ADD.L #PLATFORM_H_INIT, D1 ; offset player below platform
+    MOVE.L D1, PLAYER_Y
+    BSR PLATFORM_COLLISION_CHECK_DONE
+
+    RTS
 
 
 *-----------------------------------------------------------
