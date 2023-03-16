@@ -186,6 +186,8 @@ COIN_FOR_LOOP:
     LEA     BULLET_ARRAY_X, A1
     LEA     BULLET_ARRAY_Y, A0
     LEA     BULLET_ARRAY_FIRED,A3
+    MOVE.L A3,A4 *A4 will hold bullet fired status for the rest of the program
+    MOVE.L #0,NUMBER_OF_BULLETS_FIRED
 
 BULLET_FOR_LOOP: 
 
@@ -315,11 +317,13 @@ INPUT:
     MOVE.L #$20415344,  D1          ; All the inputs put in D1 WASD, in One Byte
     TRAP    #15
 
+    CMP.L    #$0000FF00, D1
+    BEQ     SHOOT
+
     CMP.L    #$FF000000, D1
     BEQ     JUMP
 
-    CMP.L    #$0000FF00, D1
-    BEQ     SHOOT
+    
 
     RTS
 
@@ -971,6 +975,25 @@ PERFORM_JUMP:
 
 
 SHOOT:
+    *USE A4 AS Pointer for Lifetime of program
+    *ALSO USE D6 FOR registering bullets fired
+    CLR.L D0
+    CLR.L D1
+    MOVE.L #MAX_BULLET_NUM,D0
+    SUB.L #1,D0
+    MOVE.L NUMBER_OF_BULLETS_FIRED,D1
+    CMP.L D0,D1
+    BLE SHOOT_NEXT_BULLET
+
+    ;if max bullets reached reset 
+    LEA BULLET_ARRAY_FIRED,A4
+    MOVE.L #0,NUMBER_OF_BULLETS_FIRED
+
+SHOOT_NEXT_BULLET:
+    MOVE.L #BULLET_FIRED_TRUE,(A4)+
+    ADD.L #1,NUMBER_OF_BULLETS_FIRED
+
+    RTS
 
 
     *-----------------------------------------------------------
@@ -1283,6 +1306,7 @@ BULLET_ARRAY_X     DC.L   01,01,01,01,01,01,01,01,01,01 ;Reserve space for 10 bu
 BULLET_ARRAY_Y     DC.L   01,01,01,01,01,01,01,01,01,01  ;Reserve space for 10 bullets yPos
 BULLET_ARRAY_FIRED DC.L   01,01,01,01,01,01,01,01,01,01  ;Reserve space for 10 bullets yPos
 BULLET_VELOCITY    DS.L    01
+NUMBER_OF_BULLETS_FIRED DS.L 01
 
 PLATFORM_ARRAY_X    DC.L   01,01,01 ;Reserve space for 3 platforms xPos
 PLATFORM_ARRAY_Y    DC.L   01,01,01  ;Reserve space for 3 platforms yPos
