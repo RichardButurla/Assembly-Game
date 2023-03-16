@@ -53,7 +53,7 @@ COIN_H_INIT         EQU     40
 
 MAX_NUM_PLATFORMS       EQU     03
 PLATFORM_DFLT_VELOCITY  EQU     -4
-PLATFORM_W_INIT         EQU     100
+PLATFORM_W_INIT         EQU     120
 PLATFORM_H_INIT         EQU     20
 
 *-----------------------------------------------------------
@@ -219,11 +219,13 @@ COIN_FOR_LOOP:
     MOVE.L PLATFORM_Y_POS_1, D1
     MOVE.L D1, (A1)+
 
+    SUB.W  #150, D2 ;Offset back a bit
     MOVE.L D2, (A0)+
     MOVE.L PLATFORM_Y_POS_2, D1
     MOVE.L D1, (A1)+
 
-    MOVE.L D2, (A0)+
+    SUB.W  #200, D2 ;Offset back a bit
+    MOVE.L D2, (A0)
     MOVE.L PLATFORM_Y_POS_3, D1
     MOVE.L D1, (A1)
 
