@@ -53,6 +53,13 @@ COIN_DFLT_VELOCITY  EQU     -3
 COIN_W_INIT         EQU     08
 COIN_H_INIT         EQU     08
 
+MAX_BULLET_NUM      EQU     10
+BULLET_DFLT_VELOCITY EQU    10   
+BULLET_W_INIT       EQU     05
+BULLET_H_INIT       EQU     02  
+BULLET_FIRED_FALSE  EQU     00
+BULLET_FIRED_TRUE  EQU      01
+
 MAX_NUM_PLATFORMS       EQU     03
 PLATFORM_DFLT_VELOCITY  EQU     -4
 PLATFORM_W_INIT         EQU     120
@@ -167,6 +174,25 @@ COIN_FOR_LOOP:
     ADD.L #250,D2
 
     DBRA      D1,COIN_FOR_LOOP
+
+    ;InitialiseBullets
+    ;Initialise coins nums
+    CLR.L D0
+    CLR.L D1
+
+    MOVE.B #MAX_BULLET_NUM, D1 ;Loop counter for 5 coins, We subtract 1 to get 4 since counts down to 0 and DBRA branches again leaving -1 in A1
+    SUB.B #1, D1
+
+    LEA     BULLET_ARRAY_X, A1
+    LEA     BULLET_ARRAY_Y, A0
+    LEA     BULLET_ARRAY_FIRED,A3
+
+BULLET_FOR_LOOP: 
+
+    MOVE.L PLAYER_Y,(A0)+ ;move d3(20) into A0 and increment A0 to next coin
+    MOVE.L PLAYER_X,(A1)+ ;move element decimal 200 into A1 and increment A1 to next coin
+    MOVE.L #BULLET_FIRED_FALSE,(A3)+ ;set bullets fired to false
+    DBRA   D1,BULLET_FOR_LOOP
 
     ;initialise Platforms
     CLR.L D0
@@ -291,6 +317,9 @@ INPUT:
 
     CMP.L    #$FF000000, D1
     BEQ     JUMP
+
+    CMP.L    #$0000FF00, D1
+    BEQ     SHOOT
 
     RTS
 
@@ -440,7 +469,8 @@ RESET_ENEMY_POSITION:
 UPDATE_COINS:
     BSR MOVE_COINS
     BSR CHECK_COIN_POSITIONS
-
+    BSR CHECK_BULLET_POSITIONS *FOR Some reason bullet checks only work here
+    BSR CHECK_IF_BULLETS_FIRED
     RTS
 
 *-----------------------------------------------------------
@@ -505,6 +535,92 @@ MOVE_COIN_LOOP:
 
     RTS
 
+*-----------------------------------------------------------
+* Subroutine    : Checks bullet fired status
+* Description   : Checks if bullets were fired
+CHECK_IF_BULLETS_FIRED:
+
+    LEA BULLET_ARRAY_FIRED, A0
+    LEA BULLET_ARRAY_X, A1
+    LEA BULLET_ARRAY_Y, A2
+    CLR.L D2
+    CLR.L D3
+    CLR.L D0
+
+    MOVE.L #MAX_BULLET_NUM,D0
+    SUB.L #1,D0
+
+    CHECK_BULLET_FIRED:
+    MOVE.L #BULLET_FIRED_TRUE,D2
+    MOVE.L (A0),D3
+    CMP D3,D2
+    BEQ MOVE_BULLET
+    CMP D3,D2
+    BNE PLAYER_HOLDS_BULLET
+
+MOVE_BULLET:
+    MOVE.L #BULLET_DFLT_VELOCITY, D1
+    ADD.L (A1), D1          ;Add bullet x pos with velocity
+    MOVE.L D1, (A1)        ;Move new xPos to bullet x position and increment pointer   
+ 
+BULLET_FIRED_CHECK_DONE:
+    ADD    #4,A0         ; increment A0 by 4 memory locations. The next BULLET_ARRAY_X which is a Long
+    ADD    #4,A1         ; increment A1 by 4 memory locations. The next BULLET_ARRAY_Y which is a Long
+    ADD    #4,A2        ; increment A2 by 4 memory locations. The next Bullet_fired_array which is a Long
+    DBRA D0,CHECK_BULLET_FIRED
+    RTS
+
+PLAYER_HOLDS_BULLET:
+    MOVE.L PLAYER_X, D1 ;Player x position
+    MOVE.L D1, (A1)        ;Move new xPos to bullet x position and increment pointer
+    MOVE.L PLAYER_Y, D1 ;Player x position
+    MOVE.L D1, (A2)        ;Move new xPos to bullet x position and increment pointer
+    BSR BULLET_FIRED_CHECK_DONE
+
+    RTS
+
+*-----------------------------------------------------------
+
+*-----------------------------------------------------------
+* Subroutine    : Checks bullet Positions
+* Description   : Checks bullet Positions
+*-----------------------------------------------------------
+CHECK_BULLET_POSITIONS:
+    CLR.L D0
+    CLR.L D1
+    CLR.L D2
+    LEA BULLET_ARRAY_X, A0
+    LEA BULLET_ARRAY_Y, A1
+    LEA BULLET_ARRAY_FIRED, A2
+
+
+    MOVE.B #1,D0
+    SUB.B #1, D0 ;MAX_COINS - 1
+
+CHECK_BULLET_POS_LOOP:
+    MOVE.L (A0),D2
+    CMP   SCREEN_W,D2
+    BGE     RESET_BULLET   ; Reset Coin if off right side of Screen
+
+    ADD    #4,A0         ; increment A0 by 4 memory locations. The next BULLET_ARRAY_X which is a Long
+    ADD    #4,A1         ; increment A1 by 4 memory locations. The next BULLET_ARRAY_Y which is a Long
+    ADD    #4,A2        ; increment A2 by 4 memory locations. The next Bullet_fired_array which is a Long
+    DBRA D0,CHECK_BULLET_POS_LOOP
+    
+
+    RTS
+
+*-----------------------------------------------------------
+* Subroutine    : Resets coins
+* Description   : Resets coins
+*-----------------------------------------------------------
+RESET_BULLET:
+    CLR.L   D1
+    MOVE.L  PLAYER_X, D1
+    MOVE.L  D1, (A0)
+    MOVE.L #BULLET_FIRED_FALSE, BULLET_ARRAY_FIRED(A2)
+
+    RTS
 
 *-----------------------------------------------------------
 * Subroutine    : Update platforms
@@ -711,10 +827,12 @@ DRAW:
 
 DRAW_IN_GAME:
     BSR     DRAW_PLYR_DATA          ; Draw Draw Score, HUD, Player X and Y
-    BSR     DRAW_PLAYER             ; Draw Player
     BSR     DRAW_ENEMY
     BSR     DRAW_COINS
     BSR     DRAW_PLATFORMS
+    BSR     DRAW_PLAYER             ; Draw Player
+    BSR     DRAW_BULLETS
+
     
     RTS                             ; Return to subroutine
 
@@ -745,8 +863,6 @@ DRAW_GAME_OVER_DATA:
     MOVE.B  #03,        D0          ; Display number at D1.L
     MOVE.L  PLAYER_SCORE,D1         ; Move Score to D1.L
     TRAP    #15   
-
-    
 
 *-----------------------------------------------------------
 * Subroutine    : Draw Player Data
@@ -854,6 +970,9 @@ PERFORM_JUMP:
     RTS                             ; Return to subroutine
 
 
+SHOOT:
+
+
     *-----------------------------------------------------------
 * Subroutine    : Move
 * Description   : Move player
@@ -946,7 +1065,7 @@ DRAW_PLAYER:
     TRAP    #15                     ; Trap (Perform action)
     RTS                             ; Return to subroutine
 
-    *-----------------------------------------------------------
+*-----------------------------------------------------------
 * Subroutine    : Draw Coins
 * Description   : Draw Coin Squares
 *-----------------------------------------------------------
@@ -1028,6 +1147,49 @@ DRAW_PLATFORM_LOOP:
     DBRA D5,DRAW_PLATFORM_LOOP
 
     RTS
+
+*-----------------------------------------------------------
+* Subroutine    : Draw Bullets
+* Description   : Draw Bullet Circles
+*-----------------------------------------------------------
+DRAW_BULLETS:
+
+    ; Set Pixel Colors
+    MOVE.L  #YELLOW,     D1          ; Set Background color
+    MOVE.B  #80,        D0          ; Task for Background Color
+    TRAP    #15                     ; Trap (Perform action)
+
+    CLR.L D0
+    CLR.L D1
+    CLR.L D2
+    CLR.L D3
+    CLR.L D4
+    CLR.L D5
+
+    ; Set X, Y, Width and Height
+    LEA     BULLET_ARRAY_X, A0
+    LEA     BULLET_ARRAY_Y, A1
+
+    MOVE.B #MAX_BULLET_NUM, D5
+    SUB.B #1,D5     ;Our index which is MAX_BULLETS - 1
+
+DRAW_BULLET_LOOP:
+    MOVE.L (A0), D1     ;Bullet X Pos
+    MOVE.L (A1), D2     ;Bullet Y Pos
+    MOVE.L (A0)+, D3     ;Bullet X Pos that we will add width onto and increment pointer
+    ADD.L #BULLET_W_INIT, D3
+    MOVE.L (A1)+, D4     ;Bullet Y Pos that we will add height onto and increment pointer
+    ADD.L #BULLET_W_INIT, D4
+
+    ; Draw Bullet
+    MOVE.B  #88,        D0          ; Draw bullet
+    TRAP    #15                     ; Trap (Perform action)
+
+    DBRA D5,DRAW_BULLET_LOOP
+
+    RTS
+
+
 *-----------------------------------------------------------
 * Subroutine    : Draw Enemy
 * Description   : Draw Enemy Square
@@ -1116,6 +1278,11 @@ ENEMY_VELOCITY  DS.L    01
 COIN_ARRAY_X    DC.L   01,01,01,01,01 ;Reserve space for 5 coins xPos
 COIN_ARRAY_Y    DC.L   01,01,01,01,01  ;Reserve space for 5 coins yPos
 COIN_VELOCITY   DS.L    01
+
+BULLET_ARRAY_X     DC.L   01,01,01,01,01,01,01,01,01,01 ;Reserve space for 10 bullets xPos
+BULLET_ARRAY_Y     DC.L   01,01,01,01,01,01,01,01,01,01  ;Reserve space for 10 bullets yPos
+BULLET_ARRAY_FIRED DC.L   01,01,01,01,01,01,01,01,01,01  ;Reserve space for 10 bullets yPos
+BULLET_VELOCITY    DS.L    01
 
 PLATFORM_ARRAY_X    DC.L   01,01,01 ;Reserve space for 3 platforms xPos
 PLATFORM_ARRAY_Y    DC.L   01,01,01  ;Reserve space for 3 platforms yPos
