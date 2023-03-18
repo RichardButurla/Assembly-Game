@@ -53,12 +53,13 @@ COIN_DFLT_VELOCITY  EQU     -3
 COIN_W_INIT         EQU     08
 COIN_H_INIT         EQU     08
 
-MAX_BULLET_NUM      EQU     10
+MAX_BULLET_NUM      EQU     20
 BULLET_DFLT_VELOCITY EQU    10   
 BULLET_W_INIT       EQU     05
 BULLET_H_INIT       EQU     02  
 BULLET_FIRED_FALSE  EQU     00
 BULLET_FIRED_TRUE  EQU      01
+SHOOT_DELAY    EQU     01
 
 MAX_NUM_PLATFORMS       EQU     03
 PLATFORM_DFLT_VELOCITY  EQU     -4
@@ -269,6 +270,11 @@ BULLET_FOR_LOOP:
     CLR.L D1
     MOVE.L  #4, D1
     MOVE.L D1, DELTA_TIME
+
+    ;Initialize Shoot Time
+    CLR.L D1
+    MOVE.L  #4, D1
+    MOVE.L D1, SHOOT_TIME
 
     ; Enable the screen back buffer(see easy 68k help)
 	MOVE.B  #TC_DBL_BUF,D0          ; 92 Enables Double Buffer
@@ -978,18 +984,40 @@ SHOOT:
     *USE A4 AS Pointer for Lifetime of program
     *ALSO USE D6 FOR registering bullets fired
     CLR.L D0
+    CLR.L D2
     CLR.L D1
-    MOVE.L #MAX_BULLET_NUM,D0
-    SUB.L #1,D0
+    CLR.L D3
+    CLR.L D4
+
+CHECK_BULLET_TIME:
+    MOVE.B #8, D0
+    TRAP #15
+    SUB.L SHOOT_TIME, D1 
+    MOVE.L #SHOOT_DELAY,D4
+    MULS #10,D4 ;Result is in Hundreths of a Second so if we want 0.1 seconds, 1 * 10
+    CMP.L D4, D1
+    BGE CHECK_NEXT_BULLET
+    ;otherwise do nothing
+    RTS
+
+CHECK_NEXT_BULLET:
+    ;Check how many were fired and if at max bullet count
+    MOVE.L #MAX_BULLET_NUM,D2
+    SUB.L #1,D2
     MOVE.L NUMBER_OF_BULLETS_FIRED,D1
-    CMP.L D0,D1
+    CMP.L D2,D1
     BLE SHOOT_NEXT_BULLET
 
     ;if max bullets reached reset 
     LEA BULLET_ARRAY_FIRED,A4
     MOVE.L #0,NUMBER_OF_BULLETS_FIRED
 
-SHOOT_NEXT_BULLET:
+SHOOT_NEXT_BULLET: 
+    ;reset time since last bullet fired
+    MOVE.B #8, D0
+    TRAP #15
+    MOVE.L D1, SHOOT_TIME
+    ;Time delay on firing
     MOVE.L #BULLET_FIRED_TRUE,(A4)+
     ADD.L #1,NUMBER_OF_BULLETS_FIRED
 
@@ -1302,9 +1330,9 @@ COIN_ARRAY_X    DC.L   01,01,01,01,01 ;Reserve space for 5 coins xPos
 COIN_ARRAY_Y    DC.L   01,01,01,01,01  ;Reserve space for 5 coins yPos
 COIN_VELOCITY   DS.L    01
 
-BULLET_ARRAY_X     DC.L   01,01,01,01,01,01,01,01,01,01 ;Reserve space for 10 bullets xPos
-BULLET_ARRAY_Y     DC.L   01,01,01,01,01,01,01,01,01,01  ;Reserve space for 10 bullets yPos
-BULLET_ARRAY_FIRED DC.L   01,01,01,01,01,01,01,01,01,01  ;Reserve space for 10 bullets yPos
+BULLET_ARRAY_X     DC.L   01,01,01,01,01,01,01,01,01,01,01,01,01,01,01,01,01,01,01,01 ;Reserve space for 20 bullets xPos
+BULLET_ARRAY_Y     DC.L   01,01,01,01,01,01,01,01,01,01,01,01,01,01,01,01,01,01,01,01  ;Reserve space for 20 bullets yPos
+BULLET_ARRAY_FIRED DC.L   01,01,01,01,01,01,01,01,01,01,01,01,01,01,01,01,01,01,01,01  ;Reserve space for 20 bullets yPos
 BULLET_VELOCITY    DS.L    01
 NUMBER_OF_BULLETS_FIRED DS.L 01
 
@@ -1323,6 +1351,7 @@ GAME_IS_OVER    DS.L    01  ;Reserve space for game over bool
 
 
 DELTA_TIME      DS.L    01  ; Reserve Space for Delta Time
+SHOOT_TIME      DS.L    01  ; Reserve Space for Time since last bullet fired Time
 
 *-----------------------------------------------------------
 * Section       : Sounds
