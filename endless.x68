@@ -65,6 +65,12 @@ BULLET_FIRED_FALSE  EQU     00
 BULLET_FIRED_TRUE  EQU      01
 SHOOT_DELAY    EQU     01
 
+MAX_ENEMY_BULLET_NUM        EQU    10
+ENEMY_BULLET_DFLT_VELOCITY  EQU    -10 
+ENEMY_BULLET_FIRED_FALSE    EQU    00
+ENEMY_BULLET_FIRED_TRUE     EQU    01
+ENEMY_SHOOT_DELAY           EQU    01
+
 MAX_NUM_PLATFORMS       EQU     03
 PLATFORM_DFLT_VELOCITY  EQU     -4
 PLATFORM_W_INIT         EQU     120
@@ -186,7 +192,6 @@ COIN_FOR_LOOP:
     DBRA      D1,COIN_FOR_LOOP
 
     ;InitialiseBullets
-    ;Initialise coins nums
     CLR.L D0
     CLR.L D1
 
@@ -205,6 +210,26 @@ BULLET_FOR_LOOP:
     MOVE.L PLAYER_X,(A1)+ ;move element decimal 200 into A1 and increment A1 to next coin
     MOVE.L #BULLET_FIRED_FALSE,(A3)+ ;set bullets fired to false
     DBRA   D1,BULLET_FOR_LOOP
+
+    ;Initialise enemy bullets
+    CLR.L D0
+    CLR.L D1
+
+    MOVE.B #MAX_ENEMY_BULLET_NUM, D1 ;Loop counter for 10 bullets, We subtract 1 to get 4 since counts down to 0 and DBRA branches again leaving -1 in A1
+    SUB.B #1, D1
+
+    LEA     ENEMY_BULLETS_ARRAY_X, A1
+    LEA     ENEMY_BULLETS_ARRAY_Y, A0
+    LEA     ENEMY_BULLETS_ARRAY_FIRED,A3
+    MOVE.L A3,A5 *A4 will hold bullet fired status for the rest of the program
+    MOVE.L #0,NUMBER_OF_ENEMY_BULLETS_FIRED
+
+ENEMY_BULLET_FOR_LOOP: 
+
+    MOVE.L ENEMY_Y,(A0)+ ;move d3(20) into A0 and increment A0 to next bullet
+    MOVE.L ENEMY_X,(A1)+ ;move element decimal 200 into A1 and increment A1 to next bullet
+    MOVE.L #ENEMY_BULLET_FIRED_FALSE,(A3)+ ;set bullets fired to false
+    DBRA   D1,ENEMY_BULLET_FOR_LOOP
 
     ;initialise Platforms
     CLR.L D0
@@ -283,6 +308,11 @@ BULLET_FOR_LOOP:
     ;Initialize Shoot Time
     CLR.L D1
     MOVE.L  #4, D1
+    MOVE.L D1, ENEMY_SHOOT_TIME
+
+    ;Initialize Shoot Time
+    CLR.L D1
+    MOVE.L  #4, D1
     MOVE.L D1, SHOOT_TIME
 
     ; Enable the screen back buffer(see easy 68k help)
@@ -353,7 +383,8 @@ UPDATE:
     BSR     UPDATE_PLATFORMS
     BSR     CHECK_COIN_COLLISIONS
     BSR     CHECK_PLATFORM_COLLISIONS
-    BSR     CHECK_ENEMY_BULLETS_COLLISIONS
+    BSR     CHECK_PLAYER_BULLETS_COLLISIONS
+    BSR     CHECK_ENEMY_BULLET_TIME
     RTS                             ; Return to subroutine  
 
 
@@ -505,7 +536,7 @@ CHANGE_ENEMY_Y_VEL_DOWN:
 * Subroutine    : Check Enemy collision against bullets
 * Description   : checks collision with enemy and bullets
 *-----------------------------------------------------------
-CHECK_ENEMY_BULLETS_COLLISIONS:
+CHECK_PLAYER_BULLETS_COLLISIONS:
     LEA BULLET_ARRAY_X, A1 ; Load coin X array into address register
     LEA BULLET_ARRAY_Y, A2 ; Load coin Y array into address register
 
@@ -570,6 +601,9 @@ UPDATE_COINS:
     BSR CHECK_COIN_POSITIONS
     BSR CHECK_BULLET_POSITIONS *FOR Some reason bullet checks only work here
     BSR CHECK_IF_BULLETS_FIRED
+
+    BSR CHECK_ENEMY_BULLET_POSITIONS
+    BSR CHECK_IF_ENEMY_BULLETS_FIRED
     RTS
 
 *-----------------------------------------------------------
@@ -899,6 +933,92 @@ CHECK_BELOW_COLLISION:
 
     RTS
 
+*-----------------------------------------------------------
+* Subroutine    : Checks Enemy bullet fired status
+* Description   : Checks if Enemy bullets were fired
+CHECK_IF_ENEMY_BULLETS_FIRED:
+
+    LEA ENEMY_BULLETS_ARRAY_FIRED, A0
+    LEA ENEMY_BULLETS_ARRAY_X, A1
+    LEA ENEMY_BULLETS_ARRAY_Y, A2
+    CLR.L D2
+    CLR.L D3
+    CLR.L D0
+
+    MOVE.L #MAX_ENEMY_BULLET_NUM,D0
+    SUB.L #1,D0
+
+    CHECK_ENEMY_BULLET_FIRED:
+    MOVE.L #BULLET_FIRED_TRUE,D2
+    MOVE.L (A0),D3
+    CMP D3,D2
+    BEQ MOVE_ENEMY_BULLET
+    CMP D3,D2
+    BNE ENEMY_HOLDS_BULLET
+
+MOVE_ENEMY_BULLET:
+    MOVE.L #ENEMY_BULLET_DFLT_VELOCITY, D1
+    ADD.L (A1), D1          ;Add bullet x pos with velocity
+    MOVE.L D1, (A1)        ;Move new xPos to bullet x position and increment pointer   
+ 
+ENEMY_BULLET_FIRED_CHECK_DONE:
+    ADD    #4,A0         ; increment A0 by 4 memory locations. The next BULLET_ARRAY_X which is a Long
+    ADD    #4,A1         ; increment A1 by 4 memory locations. The next BULLET_ARRAY_Y which is a Long
+    ADD    #4,A2        ; increment A2 by 4 memory locations. The next Bullet_fired_array which is a Long
+    DBRA D0,CHECK_ENEMY_BULLET_FIRED
+    RTS
+
+ENEMY_HOLDS_BULLET:
+    MOVE.L ENEMY_X, D1 ;Enemy x position
+    MOVE.L D1, (A1)        ;Move new xPos to bullet x position and increment pointer
+    MOVE.L ENEMY_Y, D1 ;Enemy x position
+    MOVE.L D1, (A2)        ;Move new xPos to bullet x position and increment pointer
+    BSR ENEMY_BULLET_FIRED_CHECK_DONE
+
+    RTS
+
+*-----------------------------------------------------------
+
+*-----------------------------------------------------------
+* Subroutine    : Checks bullet Positions
+* Description   : Checks bullet Positions
+*-----------------------------------------------------------
+CHECK_ENEMY_BULLET_POSITIONS:
+    CLR.L D0
+    CLR.L D1
+    CLR.L D2
+    LEA ENEMY_BULLETS_ARRAY_X, A0
+    LEA ENEMY_BULLETS_ARRAY_Y, A1
+    LEA ENEMY_BULLETS_ARRAY_FIRED, A2
+
+
+    MOVE.B #MAX_ENEMY_BULLET_NUM,D0
+    SUB.B #1, D0 ;MAX_ENEMY_BULLET_NUM - 1
+
+CHECK_ENEMY_BULLET_POS_LOOP:
+    MOVE.L (A0),D2
+    CMP   #0,D2
+    BLE     RESET_ENEMY_BULLET   ; Reset Coin if off right side of Screen
+
+    ADD    #4,A0         ; increment A0 by 4 memory locations. The next BULLET_ARRAY_X which is a Long
+    ADD    #4,A1         ; increment A1 by 4 memory locations. The next BULLET_ARRAY_Y which is a Long
+    ADD    #4,A2        ; increment A2 by 4 memory locations. The next Bullet_fired_array which is a Long
+    DBRA D0,CHECK_ENEMY_BULLET_POS_LOOP
+    
+
+    RTS
+
+*-----------------------------------------------------------
+* Subroutine    : Resets coins
+* Description   : Resets coins
+*-----------------------------------------------------------
+RESET_ENEMY_BULLET:
+    CLR.L   D1
+    MOVE.L  ENEMY_X, D1
+    MOVE.L  D1, (A0)
+    MOVE.L #BULLET_FIRED_FALSE,(A2)
+
+    RTS
 
 *-----------------------------------------------------------
 * Subroutine    : Draw
@@ -931,6 +1051,7 @@ DRAW_IN_GAME:
     BSR     DRAW_PLATFORMS
     BSR     DRAW_PLAYER             ; Draw Player
     BSR     DRAW_BULLETS
+    BSR     DRAW_ENEMY_BULLETS
 
     
     RTS                             ; Return to subroutine
@@ -1129,6 +1250,52 @@ MOVE_PLAYER_UP:
 MOVE_PLAYER_DOWN:
     ADD.L #PLYR_MOVE_Y_VEL, PLAYER_Y
     RTS                                  ; Return to subroutine
+
+ENEMY_SHOOT:
+    *USE A4 AS Pointer for Lifetime of program
+    *ALSO USE D6 FOR registering bullets fired
+    CLR.L D0
+    CLR.L D2
+    CLR.L D1
+    CLR.L D3
+    CLR.L D4
+*-----------------------------------------------------------
+* Subroutine    : CHECK_ENEMY_BULLET_TIME
+* Description   : Fires bullets based on a timer
+*----------------------------------------------------------- 
+CHECK_ENEMY_BULLET_TIME:
+    MOVE.B #8, D0
+    TRAP #15
+    SUB.L ENEMY_SHOOT_TIME, D1 
+    MOVE.L #ENEMY_SHOOT_DELAY,D4
+    MULS #100,D4 ;Result is in Hundreths of a Second so if we want 1 second, 1 * 100
+    CMP.L D4, D1
+    BGE CHECK_NEXT_ENEMY_BULLET
+    ;otherwise do nothing
+    RTS
+
+CHECK_NEXT_ENEMY_BULLET:
+    ;Check how many were fired and if at max bullet count
+    MOVE.L #MAX_ENEMY_BULLET_NUM,D2
+    SUB.L #1,D2
+    MOVE.L NUMBER_OF_ENEMY_BULLETS_FIRED,D1
+    CMP.L D2,D1
+    BLE SHOOT_NEXT_ENEMY_BULLET
+
+    ;if max bullets reached reset 
+    LEA ENEMY_BULLETS_ARRAY_FIRED,A5
+    MOVE.L #0,NUMBER_OF_ENEMY_BULLETS_FIRED
+
+SHOOT_NEXT_ENEMY_BULLET: 
+    ;reset time since last bullet fired
+    MOVE.B #8, D0
+    TRAP #15
+    MOVE.L D1, ENEMY_SHOOT_TIME
+    ;Time delay on firing
+    MOVE.L #BULLET_FIRED_TRUE,(A5)+
+    ADD.L #1,NUMBER_OF_ENEMY_BULLETS_FIRED
+
+    RTS
 
 *-----------------------------------------------------------
 * Subroutine    : Idle
@@ -1336,6 +1503,47 @@ DRAW_BULLET_LOOP:
 
 
 *-----------------------------------------------------------
+* Subroutine    : Draw ENEMY Bullets
+* Description   : Draw ENEMY Bullet Circles
+*-----------------------------------------------------------
+DRAW_ENEMY_BULLETS:
+
+    ; Set Pixel Colors
+    MOVE.L  #GREEN,     D1          ; Set Background color
+    MOVE.B  #80,        D0          ; Task for Background Color
+    TRAP    #15                     ; Trap (Perform action)
+
+    CLR.L D0
+    CLR.L D1
+    CLR.L D2
+    CLR.L D3
+    CLR.L D4
+    CLR.L D5
+
+    ; Set X, Y, Width and Height
+    LEA     ENEMY_BULLETS_ARRAY_X, A0
+    LEA     ENEMY_BULLETS_ARRAY_Y, A1
+
+    MOVE.B #MAX_ENEMY_BULLET_NUM, D5
+    SUB.B #1,D5     ;Our index which is MAX_ENEMY_BULLET_NUM - 1
+
+DRAW_ENEMY_BULLET_LOOP:
+    MOVE.L (A0), D1     ;Bullet X Pos
+    MOVE.L (A1), D2     ;Bullet Y Pos
+    MOVE.L (A0)+, D3     ;Bullet X Pos that we will add width onto and increment pointer
+    ADD.L #BULLET_W_INIT, D3
+    MOVE.L (A1)+, D4     ;Bullet Y Pos that we will add height onto and increment pointer
+    ADD.L #BULLET_W_INIT, D4
+
+    ; Draw Bullet
+    MOVE.B  #88,        D0          ; Draw bullet
+    TRAP    #15                     ; Trap (Perform action)
+
+    DBRA D5,DRAW_ENEMY_BULLET_LOOP
+
+    RTS
+
+*-----------------------------------------------------------
 * Subroutine    : Draw Enemy
 * Description   : Draw Enemy Square
 *-----------------------------------------------------------
@@ -1459,6 +1667,13 @@ BULLET_ARRAY_FIRED DC.L   01,01,01,01,01,01,01,01,01,01,01,01,01,01,01,01,01,01,
 BULLET_VELOCITY    DS.L    01
 NUMBER_OF_BULLETS_FIRED DS.L 01
 
+
+ENEMY_BULLETS_ARRAY_X           DC.L   01,01,01,01,01,01,01,01,01,01
+ENEMY_BULLETS_ARRAY_Y           DC.L   01,01,01,01,01,01,01,01,01,01
+ENEMY_BULLETS_ARRAY_FIRED        DC.L   01,01,01,01,01,01,01,01,01,01
+ENEMY_BULLET_VELOCITY           DS.L   01
+NUMBER_OF_ENEMY_BULLETS_FIRED   DS.L   01
+
 PLATFORM_ARRAY_X    DC.L   01,01,01 ;Reserve space for 3 platforms xPos
 PLATFORM_ARRAY_Y    DC.L   01,01,01  ;Reserve space for 3 platforms yPos
 PLATFORM_VELOCITY   DS.L   01
@@ -1473,8 +1688,9 @@ PLYR_ON_GND     DS.L    01  ; Reserve Space for Player on Ground
 GAME_IS_OVER    DS.L    01  ;Reserve space for game over bool
 
 
-DELTA_TIME      DS.L    01  ; Reserve Space for Delta Time
-SHOOT_TIME      DS.L    01  ; Reserve Space for Time since last bullet fired Time
+DELTA_TIME              DS.L    01  ; Reserve Space for Delta Time
+SHOOT_TIME              DS.L    01  ; Reserve Space for Time since last bullet fired Time
+ENEMY_SHOOT_TIME        DS.L    01  ; Reserve Space for Time since last enemy bullet fired Time
 
 *-----------------------------------------------------------
 * Section       : Sounds
