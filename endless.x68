@@ -43,6 +43,7 @@ GAME_OVER_TRUE    EQU   01
 RUN_INDEX   EQU         00          ; Player Run Sound Index  
 JMP_INDEX   EQU         01          ; Player Jump Sound Index  
 COIN_INDEX  EQU         02          ; Player Opps Sound Index
+HIT_INDEX  EQU          03          ; Player Opps Sound Index
 
 ENMY_W_INIT EQU         16          ; Enemy initial Width
 ENMY_H_INIT EQU         68          ; Enemy initial Height
@@ -95,8 +96,8 @@ D_KEY       EQU         $44         ; A ASCII Keycode
 INITIALISE:
     ; Initialise Sounds
     BSR     RUN_LOAD                ; Load Run Sound into Memory
-    BSR     JUMP_LOAD               ; Load Jump Sound into Memory
     BSR     COIN_LOAD               ; Load Opps (Collision) Sound into Memory
+    BSR     HIT_LOAD
 
     MOVE.B #0,GAME_IS_OVER          ; False
 
@@ -545,7 +546,7 @@ CHECK_SINGLE_BULLET_COLLISION:
     BGE     BULLET_COLLISION_CHECK_DONE  ; If no overlap, skip to next coin
 
     ; There's a collision, update points
-    BSR     PLAY_JUMP               ; Play Opps Wav
+    BSR     PLAY_HIT
     MOVE.L #ENEMY_DAMAGED_TRUE, ENEMY_DAMAGED
     CLR.L D4
     ADD.L #1,PLAYER_SCORE
@@ -1155,18 +1156,18 @@ PLAY_RUN:
     TRAP    #15                     ; Trap (Perform action)
     RTS                             ; Return to subroutine
 
-JUMP_LOAD:
-    LEA     JUMP_WAV,   A1          ; Load Wav File into A1
-    MOVE    #JMP_INDEX, D1          ; Assign it INDEX
+HIT_LOAD:
+    LEA     HIT_WAV,   A1          ; Load Wav File into A1
+    MOVE    #HIT_INDEX,D1          ; Assign it INDEX
     MOVE    #71,        D0          ; Load into memory
     TRAP    #15                     ; Trap (Perform action)
-    RTS                             ; Return to subroutine
+    RTS  
 
-PLAY_JUMP:
-    MOVE    #JMP_INDEX, D1          ; Load Sound INDEX
+PLAY_HIT:
+    MOVE    #HIT_INDEX, D1          ; Load Sound INDEX
     MOVE    #72,        D0          ; Play Sound
     TRAP    #15                     ; Trap (Perform action)
-    RTS                             ; Return to subroutine
+    RTS  
 
 COIN_LOAD:
     LEA     COIN_WAV,   A1          ; Load Wav File into A1
@@ -1482,7 +1483,7 @@ SHOOT_TIME      DS.L    01  ; Reserve Space for Time since last bullet fired Tim
 * so keep the files small. Used https://voicemaker.in/ to 
 * generate and Audacity to convert MP3 to WAV
 *-----------------------------------------------------------
-JUMP_WAV        DC.B    'jump.wav',0        ; Jump Sound
+HIT_WAV        DC.B    'hit.wav',0        ; Jump Sound
 RUN_WAV         DC.B    'run.wav',0         ; Run Sound
 COIN_WAV        DC.B    'coin.wav',0        ; Collision Opps
 
