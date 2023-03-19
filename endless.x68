@@ -40,10 +40,11 @@ GND_FALSE   EQU         00          ; Player on Ground False
 
 GAME_OVER_TRUE    EQU   01
 
-RUN_INDEX   EQU         00          ; Player Run Sound Index  
 JMP_INDEX   EQU         01          ; Player Jump Sound Index  
 COIN_INDEX  EQU         02          ; Player Opps Sound Index
-HIT_INDEX  EQU          03          ; Player Opps Sound Index
+HIT_INDEX  EQU          03          ; Player Hit Sound Index
+GAME_OVER_INDEX  EQU    00          ; Player Game Over Sound Index
+
 
 ENMY_W_INIT EQU         16          ; Enemy initial Width
 ENMY_H_INIT EQU         68          ; Enemy initial Height
@@ -70,6 +71,8 @@ ENEMY_BULLET_DFLT_VELOCITY  EQU    -10
 ENEMY_BULLET_FIRED_FALSE    EQU    00
 ENEMY_BULLET_FIRED_TRUE     EQU    01
 ENEMY_SHOOT_DELAY           EQU    01
+ENEMY_BULLET_W_INIT       EQU     20
+ENEMY_BULLET_H_INIT       EQU     08 
 
 MAX_NUM_PLATFORMS       EQU     03
 PLATFORM_DFLT_VELOCITY  EQU     -4
@@ -101,9 +104,9 @@ D_KEY       EQU         $44         ; A ASCII Keycode
 *-----------------------------------------------------------
 INITIALISE:
     ; Initialise Sounds
-    BSR     RUN_LOAD                ; Load Run Sound into Memory
     BSR     COIN_LOAD               ; Load Opps (Collision) Sound into Memory
     BSR     HIT_LOAD
+    BSR     GAME_OVER_LOAD
 
     MOVE.B #0,GAME_IS_OVER          ; False
 
@@ -332,7 +335,6 @@ ENEMY_BULLET_FOR_LOOP:
 * (Input, Update, Draw). The Enemies Run at Player Jump to Avoid
 *-----------------------------------------------------------
 GAME:
-    BSR     PLAY_RUN                ; Play Run Wav
 GAMELOOP:
     MOVE.B #8, D0
     TRAP #15
@@ -614,7 +616,7 @@ CHECK_SINGLE_ENEMY_BULLET_COLLISION:
     ; Player_H + Player_Y >= Bullet_Y
     MOVE.L  PLAYER_X, D1          ; Move player X to D1
     MOVE.L  (A1), D2              ; Move coin X to D2
-    ADD.L   #BULLET_W_INIT, D2      ; Add coin width to D2
+    ADD.L   #ENEMY_BULLET_W_INIT, D2      ; Add coin width to D2
     CMP.L   D1, D2                ; Check if there's overlap on X axis
     BLE     ENEMY_BULLET_COLLISION_CHECK_DONE  ; If no overlap, skip to next bullet
 
@@ -626,7 +628,7 @@ CHECK_SINGLE_ENEMY_BULLET_COLLISION:
 
     MOVE.L  PLAYER_Y, D1          ; Move player Y to D1
     MOVE.L  (A2), D2              ; Move coin Y to D2
-    ADD.L  #BULLET_H_INIT, D2      ; Add coin height to D2
+    ADD.L  #ENEMY_BULLET_H_INIT, D2      ; Add coin height to D2
     CMP.L   D1, D2                ; Check if there's overlap on Y axis
     BLE     ENEMY_BULLET_COLLISION_CHECK_DONE  ; If no overlap, skip to next bullet
 
@@ -637,11 +639,12 @@ CHECK_SINGLE_ENEMY_BULLET_COLLISION:
     BGE     ENEMY_BULLET_COLLISION_CHECK_DONE  ; If no overlap, skip to next bullet
 
     ; There's a collision, update points
-    BSR     PLAY_HIT
     CLR.L D4
     SUB.L #1,PLAYER_SCORE
     MOVE.W  SCREEN_W,   D3         ; Place Screen width in D1
     MOVE.L  D3,         (A1)     ; bullet X Position
+    BSR PLAY_GAME_OVER
+    MOVE.B  #GAME_OVER_TRUE,GAME_IS_OVER
 
 
 ENEMY_BULLET_COLLISION_CHECK_DONE:
@@ -1360,27 +1363,13 @@ SHOOT_NEXT_ENEMY_BULLET:
 * Description   : Perform a Idle
 *----------------------------------------------------------- 
 IDLE:
-    BSR     PLAY_RUN                ; Play Run Wav
     RTS                             ; Return to subroutine
 
 *-----------------------------------------------------------
 * Subroutines   : Sound Load and Play
 * Description   : Initialise game sounds into memory 
 * Current Sounds are RUN, JUMP and Opps for Collision
-*-----------------------------------------------------------
-RUN_LOAD:
-    LEA     RUN_WAV,    A1          ; Load Wav File into A1
-    MOVE    #RUN_INDEX, D1          ; Assign it INDEX
-    MOVE    #71,        D0          ; Load into memory
-    TRAP    #15                     ; Trap (Perform action)
-    RTS                             ; Return to subroutine
-
-PLAY_RUN:
-    MOVE    #RUN_INDEX, D1          ; Load Sound INDEX
-    MOVE    #72,        D0          ; Play Sound
-    TRAP    #15                     ; Trap (Perform action)
-    RTS                             ; Return to subroutine
-
+*---------------------------------------------------------
 HIT_LOAD:
     LEA     HIT_WAV,   A1          ; Load Wav File into A1
     MOVE    #HIT_INDEX,D1          ; Assign it INDEX
@@ -1393,6 +1382,19 @@ PLAY_HIT:
     MOVE    #72,        D0          ; Play Sound
     TRAP    #15                     ; Trap (Perform action)
     RTS  
+
+GAME_OVER_LOAD:
+    LEA     GAME_OVER_WAV,   A1          ; Load Wav File into A1
+    MOVE    #GAME_OVER_INDEX,D1          ; Assign it INDEX
+    MOVE    #71,        D0          ; Load into memory
+    TRAP    #15                     ; Trap (Perform action)
+    RTS  
+
+PLAY_GAME_OVER:
+    MOVE    #GAME_OVER_INDEX, D1          ; Load Sound INDEX
+    MOVE    #72,        D0          ; Play Sound
+    TRAP    #15                     ; Trap (Perform action)
+    RTS 
 
 COIN_LOAD:
     LEA     COIN_WAV,   A1          ; Load Wav File into A1
@@ -1589,9 +1591,9 @@ DRAW_ENEMY_BULLET_LOOP:
     MOVE.L (A0), D1     ;Bullet X Pos
     MOVE.L (A1), D2     ;Bullet Y Pos
     MOVE.L (A0)+, D3     ;Bullet X Pos that we will add width onto and increment pointer
-    ADD.L #BULLET_W_INIT, D3
+    ADD.L #ENEMY_BULLET_W_INIT, D3
     MOVE.L (A1)+, D4     ;Bullet Y Pos that we will add height onto and increment pointer
-    ADD.L #BULLET_W_INIT, D4
+    ADD.L #ENEMY_BULLET_H_INIT, D4
 
     ; Draw Bullet
     MOVE.B  #88,        D0          ; Draw bullet
@@ -1758,10 +1760,11 @@ ENEMY_SHOOT_TIME        DS.L    01  ; Reserve Space for Time since last enemy bu
 * generate and Audacity to convert MP3 to WAV
 *-----------------------------------------------------------
 HIT_WAV        DC.B    'hit.wav',0        ; Jump Sound
-RUN_WAV         DC.B    'run.wav',0         ; Run Sound
 COIN_WAV        DC.B    'coin.wav',0        ; Collision Opps
+GAME_OVER_WAV        DC.B    'gameOver.wav',0        ; Collision Opps
 
     END    START        ; last line of source
+
 
 *~Font name~Courier New~
 *~Font size~10~
