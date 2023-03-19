@@ -44,8 +44,8 @@ RUN_INDEX   EQU         00          ; Player Run Sound Index
 JMP_INDEX   EQU         01          ; Player Jump Sound Index  
 COIN_INDEX  EQU         02          ; Player Opps Sound Index
 
-ENMY_W_INIT EQU         08          ; Enemy initial Width
-ENMY_H_INIT EQU         128          ; Enemy initial Height
+ENMY_W_INIT EQU         16          ; Enemy initial Width
+ENMY_H_INIT EQU         68          ; Enemy initial Height
 ENEMY_UP_VELOCITY  EQU     -2
 ENEMY_DOWN_VELOCITY  EQU     2
 ENEMY_DAMAGED_TRUE   EQU    01
@@ -956,7 +956,7 @@ DRAW_GAME_OVER_DATA:
 
     ; Player Score Value
     MOVE.B  #TC_CURSR_P,D0          ; Set Cursor Position
-    MOVE.W  #$2912,     D1          ; Col 09, Row 01
+    MOVE.W  #$3012,     D1          ; Col 09, Row 01
     TRAP    #15                     ; Trap (Perform action)
     MOVE.B  #03,        D0          ; Display number at D1.L
     MOVE.L  PLAYER_SCORE,D1         ; Move Score to D1.L
