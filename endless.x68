@@ -48,6 +48,8 @@ ENMY_W_INIT EQU         08          ; Enemy initial Width
 ENMY_H_INIT EQU         128          ; Enemy initial Height
 ENEMY_UP_VELOCITY  EQU     -2
 ENEMY_DOWN_VELOCITY  EQU     2
+ENEMY_DAMAGED_TRUE   EQU    01
+ENEMY_DAMAGED_FALSE   EQU   00
 
 MAX_NUM_COINS       EQU     05
 COIN_DFLT_VELOCITY  EQU     -3
@@ -151,6 +153,9 @@ INITIALISE:
     CLR.L D1
     MOVE.L #ENEMY_UP_VELOCITY, D1
     MOVE.L D1,      ENEMY_VELOCITY
+
+    CLR.L D1
+    MOVE.L #ENEMY_DAMAGED_FALSE,ENEMY_DAMAGED
 
     ;initial velocity for coin
     CLR.L D1
@@ -541,6 +546,7 @@ CHECK_SINGLE_BULLET_COLLISION:
 
     ; There's a collision, update points
     BSR     PLAY_JUMP               ; Play Opps Wav
+    MOVE.L #ENEMY_DAMAGED_TRUE, ENEMY_DAMAGED
     CLR.L D4
     ADD.L #1,PLAYER_SCORE
     MOVE.W  SCREEN_W,   D3         ; Place Screen width in D1
@@ -1338,12 +1344,31 @@ DRAW_ENEMY:
     CLR.L D2
     CLR.L D3
     CLR.L D4
-    ; Set Pixe
-    ; Set Pixel Colors
+
+     ; Set Pixel Colors
     MOVE.L  #RED,       D1          ; Set Background color
     MOVE.B  #80,        D0          ; Task for Background Color
     TRAP    #15                     ; Trap (Perform action)
 
+    CLR.L D1
+    CLR.L D2
+
+    ;Check if enemy was damaged and change color if so
+    MOVE.L ENEMY_DAMAGED,D1
+    MOVE.L #ENEMY_DAMAGED_TRUE,D2
+    CMP     D2,D1
+    BNE    DRAW_ENEMY_SUBR 
+
+    ; This will be skipped if not damaged
+    MOVE.L  #DARK_RED,       D1          ; Set Background color
+    MOVE.B  #80,        D0          ; Task for Background Color
+    TRAP    #15                     ; Trap (Perform action)
+    MOVE.L #ENEMY_DAMAGED_FALSE,ENEMY_DAMAGED
+    
+    CLR.L D1
+    CLR.L D2
+
+DRAW_ENEMY_SUBR:
     ; Set X, Y, Width and Height
     MOVE.L  ENEMY_X,    D1          ; X
     MOVE.L  ENEMY_Y,    D2          ; Y
@@ -1356,6 +1381,8 @@ DRAW_ENEMY:
     MOVE.B  #87,        D0          ; Draw Enemy
     TRAP    #15                     ; Trap (Perform action)
     RTS                             ; Return to subroutine
+
+
 *-----------------------------------------------------------
 * Subroutine    : EXIT
 * Description   : Exit message and End Game
@@ -1391,6 +1418,7 @@ EXIT_MSG        DC.B    'Exiting....', 0    ; Exit Message
 *-----------------------------------------------------------
 WHITE           EQU     $00FFFFFF
 RED             EQU     $000000FF
+DARK_RED        EQU     $0000008B
 YELLOW          EQU     $0000FFFF
 GREEN           EQU     $00FF00FF
 
@@ -1418,6 +1446,7 @@ PLAYER_SCORE    DS.L    01  ; Reserve Space for Player Score
 ENEMY_X         DS.L    01
 ENEMY_Y         DS.L    01
 ENEMY_VELOCITY  DS.L    01
+ENEMY_DAMAGED   DS.L    01
 
 COIN_ARRAY_X    DC.L   01,01,01,01,01 ;Reserve space for 5 coins xPos
 COIN_ARRAY_Y    DC.L   01,01,01,01,01  ;Reserve space for 5 coins yPos
