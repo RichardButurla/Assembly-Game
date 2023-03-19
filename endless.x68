@@ -46,7 +46,8 @@ COIN_INDEX  EQU         02          ; Player Opps Sound Index
 
 ENMY_W_INIT EQU         08          ; Enemy initial Width
 ENMY_H_INIT EQU         128          ; Enemy initial Height
-ENEMY_DEFAULT_VELOCITY  EQU     -5
+ENEMY_UP_VELOCITY  EQU     -2
+ENEMY_DOWN_VELOCITY  EQU     2
 
 MAX_NUM_COINS       EQU     05
 COIN_DFLT_VELOCITY  EQU     -3
@@ -137,6 +138,8 @@ INITIALISE:
     ; Initial Position for Enemy
     CLR.L   D1                      ; Clear contents of D1 (XOR is faster)
     MOVE.W  SCREEN_W,   D1          ; Place Screen width in D1
+    SUB.W   #ENMY_W_INIT,D1
+    SUB.W   #ENMY_W_INIT,D1
     MOVE.L  D1,         ENEMY_X     ; Enemy X Position
 
     CLR.L   D1                      ; Clear contents of D1 (XOR is faster)
@@ -146,10 +149,10 @@ INITIALISE:
 
     ;initial velocity for enemy
     CLR.L D1
-    MOVE.L #ENEMY_DEFAULT_VELOCITY, D1
+    MOVE.L #ENEMY_UP_VELOCITY, D1
     MOVE.L D1,      ENEMY_VELOCITY
 
-    ;initial velocity for enemy
+    ;initial velocity for coin
     CLR.L D1
     MOVE.L #COIN_DFLT_VELOCITY, D1
     MOVE.L D1,      COIN_VELOCITY
@@ -435,10 +438,25 @@ MOVE_PLAYER:
 *-----------------------------------------------------------
 UPDATE_ENEMY:
     BSR MOVE_ENEMY
+    CLR.L D0
+    CLR.L D1
 
-    MOVE.L  ENEMY_X,    D1          ; Move the Enemy X Position to D1
-    CMP.L   #00,        D1
-    BLE     RESET_ENEMY   ; Reset Enemy if off Screen
+    ;check if enemy below screen
+    MOVE.L  ENEMY_Y,    D1          ; Move the Enemy X Position to D1
+    MOVE.L SCREEN_H,    D0
+    CLR.W D0
+    SWAP D0
+    SUB.L #ENMY_H_INIT, D0
+    
+    
+    CMP.L   D0,        D1
+    BGE     CHANGE_ENEMY_Y_VEL_UP   ; change Enemy y vel if off Screen
+
+    CMP.L #0,D1 
+    BLE   CHANGE_ENEMY_Y_VEL_DOWN
+
+    CLR.L D0
+    CLR.L D1
 
     RTS
     
@@ -449,26 +467,30 @@ UPDATE_ENEMY:
 MOVE_ENEMY:
     CLR.L   D1                      ; Clear contents of D1 (XOR is faster)
     MOVE.L  ENEMY_VELOCITY, D1       
-    ADD.L   ENEMY_X,   D1          ; Add Velocity to Enemy
-    MOVE.L  D1,         ENEMY_X    ; Update Players Y Position 
+    ADD.L   ENEMY_Y,   D1          ; Add Velocity to Enemy
+    MOVE.L  D1,         ENEMY_Y    ; Update Players Y Position
+    CLR.L D1 
     RTS
-
-    *-----------------------------------------------------------
-* Subroutine    : Reset Enemy
-* Description   : Reset Enemy
 *-----------------------------------------------------------
-RESET_ENEMY:
-    BSR RESET_ENEMY_POSITION
-    RTS
-
-    *-----------------------------------------------------------
-* Subroutine    : Reset Enemy
-* Description   : Reset Enemy if to passes 0 to Right of Screen
+* Subroutine    : Chnage Enemy Y Vel
+* Description   : Enemies y vel is upwards now
 *-----------------------------------------------------------
-RESET_ENEMY_POSITION:
+CHANGE_ENEMY_Y_VEL_UP:
     CLR.L   D1                      ; Clear contents of D1 (XOR is faster)
-    MOVE.W  SCREEN_W,   D1          ; Place Screen width in D1
-    MOVE.L  D1,         ENEMY_X     ; Enemy X Position
+    MOVE.L  #ENEMY_UP_VELOCITY,   D1          ; Place Screen width in D1
+    MOVE.L  D1,         ENEMY_VELOCITY     ; Enemy X Position
+    CLR.L D1 
+    RTS
+
+*-----------------------------------------------------------
+* Subroutine    : Chnage Enemy Y Vel
+* Description   : Enemies y vel is upwards now
+*-----------------------------------------------------------
+CHANGE_ENEMY_Y_VEL_DOWN:
+    CLR.L   D1                      ; Clear contents of D1 (XOR is faster)
+    MOVE.L  #ENEMY_DOWN_VELOCITY,   D1          ; Place Screen width in D1
+    MOVE.L  D1,         ENEMY_VELOCITY     ; Enemy X Position
+    CLR.L D1 
     RTS
 
 
@@ -1098,6 +1120,11 @@ PLAY_COIN:
 * Description   : Draw Player Square
 *-----------------------------------------------------------
 DRAW_PLAYER:
+    CLR.L D0
+    CLR.L D1
+    CLR.L D2
+    CLR.L D3
+    CLR.L D4
     ; Set Pixel Colors
     MOVE.L  #WHITE,     D1          ; Set Background color
     MOVE.B  #80,        D0          ; Task for Background Color
@@ -1246,6 +1273,12 @@ DRAW_BULLET_LOOP:
 * Description   : Draw Enemy Square
 *-----------------------------------------------------------
 DRAW_ENEMY:
+    CLR.L D0
+    CLR.L D1
+    CLR.L D2
+    CLR.L D3
+    CLR.L D4
+    ; Set Pixe
     ; Set Pixel Colors
     MOVE.L  #RED,       D1          ; Set Background color
     MOVE.B  #80,        D0          ; Task for Background Color
