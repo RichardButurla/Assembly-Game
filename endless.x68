@@ -384,6 +384,7 @@ UPDATE:
     BSR     CHECK_COIN_COLLISIONS
     BSR     CHECK_PLATFORM_COLLISIONS
     BSR     CHECK_PLAYER_BULLETS_COLLISIONS
+    BSR     CHECK_ENEMY_BULLETS_COLLISIONS
     BSR     CHECK_ENEMY_BULLET_TIME
     RTS                             ; Return to subroutine  
 
@@ -591,6 +592,63 @@ BULLET_COLLISION_CHECK_DONE:
     DBRA D0, CHECK_SINGLE_BULLET_COLLISION ; Check next coin
     RTS ; Return to caller
 
+
+* Subroutine    : Check Player collision against Enemy bullets
+* Description   : checks player collision with player and enemy bullets
+*-----------------------------------------------------------
+CHECK_ENEMY_BULLETS_COLLISIONS:
+    LEA ENEMY_BULLETS_ARRAY_X, A1 ; Load enemy bullet X array into address register
+    LEA ENEMY_BULLETS_ARRAY_Y, A2 ; Load enemy bullet Y array into address register
+
+    MOVE.W #MAX_ENEMY_BULLET_NUM, D0
+    SUB.W #1,D0
+
+CHECK_SINGLE_ENEMY_BULLET_COLLISION:
+    CLR.L D1
+    CLR.L D2
+
+    ; Check collision for a single bullet
+    ; Player_X <= Bullet_X + Bullet_W &&
+    ; Player_X_X + Player_W >= Bullet_X &&
+    ; Player_Y <= Bullet_Y + Bullet_H &&
+    ; Player_H + Player_Y >= Bullet_Y
+    MOVE.L  PLAYER_X, D1          ; Move player X to D1
+    MOVE.L  (A1), D2              ; Move coin X to D2
+    ADD.L   #BULLET_W_INIT, D2      ; Add coin width to D2
+    CMP.L   D1, D2                ; Check if there's overlap on X axis
+    BLE     ENEMY_BULLET_COLLISION_CHECK_DONE  ; If no overlap, skip to next bullet
+
+    MOVE.L  PLAYER_X, D1          ; Move player X to D1
+    MOVE.L  (A1), D2              ; Move coin X to D2
+    ADD.L   #PLYR_W_INIT, D1       ; Add player width to D1
+    CMP.L   D1, D2                ; Check if there's overlap on X axis
+    BGE     ENEMY_BULLET_COLLISION_CHECK_DONE  ; If no overlap, skip to next bullet
+
+    MOVE.L  PLAYER_Y, D1          ; Move player Y to D1
+    MOVE.L  (A2), D2              ; Move coin Y to D2
+    ADD.L  #BULLET_H_INIT, D2      ; Add coin height to D2
+    CMP.L   D1, D2                ; Check if there's overlap on Y axis
+    BLE     ENEMY_BULLET_COLLISION_CHECK_DONE  ; If no overlap, skip to next bullet
+
+    MOVE.L  PLAYER_Y, D1          ; Move player Y to D1
+    MOVE.L  (A2), D2              ; Move coin Y to D2
+    ADD.L   #PLYR_W_INIT, D1       ; Add player height to D1
+    CMP.L   D1, D2                ; Check if there's overlap on Y axis
+    BGE     ENEMY_BULLET_COLLISION_CHECK_DONE  ; If no overlap, skip to next bullet
+
+    ; There's a collision, update points
+    BSR     PLAY_HIT
+    CLR.L D4
+    SUB.L #1,PLAYER_SCORE
+    MOVE.W  SCREEN_W,   D3         ; Place Screen width in D1
+    MOVE.L  D3,         (A1)     ; bullet X Position
+
+
+ENEMY_BULLET_COLLISION_CHECK_DONE:
+    ADD.W #4, A1 ;next coin memory address
+    ADD.W #4, A2
+    DBRA D0, CHECK_SINGLE_ENEMY_BULLET_COLLISION ; Check next bullet
+    RTS ; Return to caller
 
 *-----------------------------------------------------------
 * Subroutine    : Update coins
